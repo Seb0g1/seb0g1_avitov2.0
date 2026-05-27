@@ -37,7 +37,7 @@ export function LoginForm({ defaultEmail }: { defaultEmail: string }) {
   return (
     <form className="login-panel grid" onSubmit={submit}>
       <div>
-        <p className="eyebrow">Single seller admin</p>
+        <p className="eyebrow">Админ продавца</p>
         <h1>Вход в каталог</h1>
       </div>
       <label>

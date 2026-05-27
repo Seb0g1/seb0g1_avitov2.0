@@ -1,7 +1,14 @@
 import crypto from "node:crypto";
 import { Prisma, VariantStatus } from "@prisma/client";
+import {
+  defaultAdType,
+  defaultClothingCondition,
+  defaultClothingItem,
+  normalizeClothingMaterials
+} from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
+import { unpublishAvitoItem } from "@/server/modules/avitoApi/items";
 import { supplierToPrismaData } from "@/server/modules/suppliers/moysklad";
 import {
   buildMultiItemGroup,
@@ -29,14 +36,30 @@ function asRecord(value: unknown): Record<string, unknown> {
 function productAttributes(input: {
   title: string;
   material?: string | null;
+  materials?: string[] | null;
+  adType?: string | null;
+  condition?: string | null;
+  clothingItem?: string | null;
+  multiItemName?: string | null;
+  manufacturerColors?: Record<string, string>;
   avitoAttributes?: Record<string, unknown> | null;
 }) {
   const existing = asRecord(input.avitoAttributes);
-  const material = input.material?.trim();
+  const materials = normalizeClothingMaterials(input.materials ?? existing.materials, input.material ?? existing.material);
   const seed = crypto.randomUUID();
+  const manufacturerColors = {
+    ...(asRecord(existing.manufacturerColors) as Record<string, string>),
+    ...(input.manufacturerColors ?? {})
+  };
   return {
     ...existing,
-    ...(material ? { material } : {}),
+    materials,
+    material: materials.join(", "),
+    adType: input.adType?.trim() || String(existing.adType ?? defaultAdType),
+    condition: input.condition?.trim() || String(existing.condition ?? defaultClothingCondition),
+    clothingItem: input.clothingItem?.trim() || String(existing.clothingItem ?? defaultClothingItem),
+    multiItemName: input.multiItemName?.trim() || String(existing.multiItemName ?? input.title),
+    manufacturerColors,
     sizeGrid: clothingSizeValues,
     multiItemGroup: String(existing.multiItemGroup ?? buildMultiItemGroup(input.title, seed))
   };
@@ -116,9 +139,20 @@ export async function createProductWithVariants(input: unknown) {
   const attributes = productAttributes({
     title: data.title,
     material: data.material,
+    materials: data.materials,
+    adType: data.adType,
+    condition: data.condition,
+    clothingItem: data.clothingItem,
+    multiItemName: data.multiItemName,
+    manufacturerColors: Object.fromEntries(
+      (data.colorGroups ?? []).map((group) => [
+        group.color,
+        group.manufacturerColor?.trim() || group.color
+      ])
+    ),
     avitoAttributes: data.avitoAttributes
   });
-  const material = String(attributes.material ?? "");
+  const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
   const colorGroups = data.colorGroups ?? [];
   const colors = uniqueValues(colorGroups.map((group) => group.color));
   const sizes = uniqueValues(colorGroups.flatMap((group) => group.sizes));
@@ -136,7 +170,7 @@ export async function createProductWithVariants(input: unknown) {
               quantity: data.quantity,
               description: buildVariantDescription({
                 title: data.title,
-                material,
+                materials,
                 color: group.color,
                 size,
                 article,
@@ -242,7 +276,7 @@ export async function regenerateProductDescriptions(id: string) {
     include: { variants: true }
   });
   const attributes = asRecord(product.avitoAttributes);
-  const material = String(attributes.material ?? "");
+  const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
   const colors = uniqueValues(product.variants.map((variant) => variant.color));
   const sizes = uniqueValues(product.variants.map((variant) => variant.size));
 
@@ -253,7 +287,7 @@ export async function regenerateProductDescriptions(id: string) {
         data: {
           description: buildVariantDescription({
             title: product.title,
-            material,
+            materials,
             color: variant.color,
             size: variant.size,
             article: buildVariantArticle(product.title, variant.color, variant.size),
@@ -272,11 +306,60 @@ export async function regenerateProductDescriptions(id: string) {
   return getProduct(id);
 }
 
-export async function deleteProduct(id: string) {
+export async function unpublishProductFromAvito(id: string) {
+  const product = await prisma.product.findUniqueOrThrow({
+    where: { id },
+    include: {
+      variants: {
+        select: {
+          id: true,
+          avitoItemId: true
+        }
+      }
+    }
+  });
+  const variants = product.variants.filter((variant) => variant.avitoItemId);
+
+  try {
+    for (const variant of variants) {
+      await unpublishAvitoItem(variant.avitoItemId as string);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Не удалось снять объявление с Avito.";
+    await prisma.errorLog.create({
+      data: {
+        source: "avitoUnpublish",
+        message,
+        details: { productId: id }
+      }
+    });
+    throw new Error(`Не удалось снять товар с Avito: ${message}`);
+  }
+
+  if (variants.length > 0) {
+    await prisma.actionLog.create({
+      data: {
+        message: "Product unpublished from Avito",
+        context: {
+          productId: id,
+          avitoItemIds: variants.map((variant) => variant.avitoItemId)
+        }
+      }
+    });
+  }
+
+  return { unpublished: variants.length };
+}
+
+export async function deleteProduct(id: string, options?: { unpublishFromAvito?: boolean }) {
+  const unpublished = options?.unpublishFromAvito
+    ? await unpublishProductFromAvito(id)
+    : { unpublished: 0 };
   await prisma.product.delete({ where: { id } });
   await prisma.actionLog.create({
-    data: { message: "Product deleted", context: { productId: id } }
+    data: { message: "Product deleted", context: { productId: id, ...unpublished } }
   });
+  return unpublished;
 }
 
 export async function createVariant(productId: string, input: unknown) {

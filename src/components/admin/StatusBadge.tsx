@@ -1,15 +1,15 @@
 import type { VariantStatus } from "@prisma/client";
 
-const labels: Record<VariantStatus, string> = {
+export const variantStatusLabels: Record<VariantStatus, string> = {
   DRAFT: "Черновик",
   READY: "Готово",
   UPLOADED: "Загружено",
   ERROR: "Ошибка",
-  MODERATION: "Модерация",
+  MODERATION: "На модерации",
   PUBLISHED: "Онлайн",
   REMOVED: "Снято"
 };
 
 export function StatusBadge({ status }: { status: VariantStatus }) {
-  return <span className={`status ${status}`}>{labels[status]}</span>;
+  return <span className={`status ${status}`}>{variantStatusLabels[status]}</span>;
 }

@@ -1,12 +1,24 @@
-export const clothingSizeOptions = [
-  { value: "46 (S)", label: "46 (S)", code: "S" },
-  { value: "48 (M)", label: "48 (M)", code: "M" },
-  { value: "50 (L)", label: "50 (L)", code: "L" },
-  { value: "54 (XL)", label: "54 (XL)", code: "XL" },
-  { value: "56 (2XL)", label: "56 (2XL)", code: "2XL" }
-] as const;
+import {
+  clothingMaterialOptions,
+  clothingSizeOptions,
+  clothingSizeValues,
+  defaultAdType,
+  defaultClothingCondition,
+  defaultClothingItem,
+  formatClothingMaterials,
+  normalizeClothingMaterials
+} from "@/lib/avitoOptions";
 
-export const clothingSizeValues = clothingSizeOptions.map((size) => size.value);
+export {
+  clothingMaterialOptions,
+  clothingSizeOptions,
+  clothingSizeValues,
+  defaultAdType,
+  defaultClothingCondition,
+  defaultClothingItem,
+  formatClothingMaterials,
+  normalizeClothingMaterials
+};
 
 const colorTranslit: Record<string, string> = {
   белый: "BELYY",
@@ -106,14 +118,15 @@ export function uniqueValues(values: string[]) {
 
 export function buildVariantDescription(input: {
   title: string;
-  material: string;
+  material?: string | null;
+  materials?: string[] | null;
   color: string;
   size: string;
   article: string;
   colors: string[];
   sizes: string[];
 }) {
-  const material = input.material.trim() || "100% Хлопок (Premium качество)";
+  const material = formatClothingMaterials(input.materials, input.material);
   const colors = uniqueValues(input.colors).join(", ") || input.color;
   const sizes = uniqueValues(input.sizes).join(", ") || input.size;
 

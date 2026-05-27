@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { Prisma, VariantStatus } from "@prisma/client";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
@@ -8,6 +9,9 @@ type AvitoRecord = Record<string, unknown>;
 type NormalizedAvitoItem = {
   avitoItemId: string;
   title: string;
+  productTitle: string;
+  productGroupKey: string | null;
+  productGroupSource: "explicit" | "autoload" | "title" | null;
   description: string | null;
   price: number;
   quantity: number;
@@ -225,8 +229,32 @@ function parseAutoloadAttributes(source: AvitoRecord) {
   return {
     autoloadId,
     color: colorToken ? translitColors[colorToken] : undefined,
-    size
+    size,
+    groupKey: buildAutoloadGroupKey(autoloadId)
   };
+}
+
+function buildAutoloadGroupKey(autoloadId: string) {
+  const tokens = autoloadId
+    .split(/[-_]/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  if (tokens.length <= 2) {
+    return autoloadId;
+  }
+
+  const upper = tokens.map((token) => token.toUpperCase());
+  const size = [...upper].reverse().find((token) => sizeTokens.has(token));
+  const sizeIndex = size ? upper.lastIndexOf(size) : -1;
+  if (sizeIndex > 0) {
+    const beforeSize = upper[sizeIndex - 1];
+    if (translitColors[beforeSize]) {
+      return tokens.slice(0, sizeIndex - 1).join("-");
+    }
+    return tokens.slice(0, sizeIndex).join("-");
+  }
+
+  return autoloadId;
 }
 
 function inferColorFromTitle(title: string) {
@@ -247,6 +275,68 @@ function inferBrandFromTitle(title: string) {
   }
 
   return cleaned.split(/\s+/)[0] || null;
+}
+
+function normalizeProductTitle(title: string) {
+  return title
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\b(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL)\b/gi, "")
+    .replace(/\b(46|48|50|52|54|56)\s*\((S|M|L|XL|2XL)\)/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stableProductId(groupKey: string) {
+  const hash = crypto.createHash("sha1").update(groupKey).digest("hex").slice(0, 16);
+  return `avito-group-${hash}`;
+}
+
+export function buildImportedProductGroupKey(item: {
+  title: string;
+  brand?: string | null;
+  category?: string | null;
+  raw?: AvitoRecord | null;
+}) {
+  const raw = record(item.raw);
+  const nestedItem = record(raw.item);
+  const explicit = firstString(
+    raw.multiItemGroup,
+    raw.multi_item_group,
+    raw.group_id,
+    raw.multi_item_id,
+    raw.multiItemId,
+    raw.multi_group_id,
+    nestedItem.multiItemGroup,
+    nestedItem.multi_item_group,
+    attribute(raw, ["multiItemGroup", "multi_item_group", "group_id", "multi_item_id"])
+  );
+  if (explicit) {
+    return {
+      key: `explicit:${explicit}`,
+      title: normalizeProductTitle(item.title) || item.title,
+      source: "explicit" as const
+    };
+  }
+
+  const autoloadId = firstString(raw.autoload_item_id, raw.autoloadItemId, raw.autoload_id);
+  if (autoloadId) {
+    return {
+      key: `autoload:${buildAutoloadGroupKey(autoloadId)}`,
+      title: normalizeProductTitle(item.title) || item.title,
+      source: "autoload" as const
+    };
+  }
+
+  const normalizedTitle = normalizeProductTitle(item.title);
+  if (normalizedTitle && item.brand && item.category) {
+    return {
+      key: `title:${item.category}:${item.brand}:${normalizedTitle.toLowerCase()}`,
+      title: normalizedTitle,
+      source: "title" as const
+    };
+  }
+
+  return null;
 }
 
 function normalizeStatus(value: unknown) {
@@ -357,10 +447,19 @@ function normalizeItem(source: AvitoRecord): NormalizedAvitoItem | null {
   const size = attribute(source, ["size", "размер"]) ?? autoloadAttributes.size ?? UNKNOWN_VALUE;
   const price = firstNumber(source.price, source.price_value, nestedItem.price);
   const status = normalizeStatus(source.status ?? source.state ?? nestedItem.status ?? nestedItem.state);
+  const group = buildImportedProductGroupKey({
+    title,
+    brand,
+    category,
+    raw: source
+  });
 
   return {
     avitoItemId: itemId,
     title,
+    productTitle: group?.title ?? title,
+    productGroupKey: group?.key ?? null,
+    productGroupSource: group?.source ?? null,
     description,
     price,
     quantity: Math.max(1, Math.trunc(firstNumber(source.quantity, source.count, nestedItem.quantity) || 1)),
@@ -377,7 +476,10 @@ function normalizeItem(source: AvitoRecord): NormalizedAvitoItem | null {
         brand,
         color,
         size,
-        autoloadItemId: autoloadAttributes.autoloadId
+        autoloadItemId: autoloadAttributes.autoloadId,
+        autoloadGroupKey: autoloadAttributes.groupKey,
+        productGroupKey: group?.key,
+        productGroupSource: group?.source
       }
     }
   };
@@ -431,19 +533,22 @@ async function importOne(item: NormalizedAvitoItem) {
     include: { product: true }
   });
 
-  const productId = existingVariant?.productId ?? `avito-${item.avitoItemId}`;
+  const previousProductId = existingVariant?.productId;
+  const productId = item.productGroupKey
+    ? stableProductId(item.productGroupKey)
+    : previousProductId ?? `avito-${item.avitoItemId}`;
   const product = await prisma.product.upsert({
     where: { id: productId },
     create: {
       id: productId,
-      title: item.title,
+      title: item.productTitle,
       brand: item.brand,
       baseCategory: item.category,
       baseDescription: item.description,
       avitoAttributes: item.raw as Prisma.InputJsonValue
     },
     update: {
-      title: item.title,
+      title: item.productTitle,
       brand: item.brand ?? undefined,
       baseCategory: item.category,
       baseDescription: item.description ?? undefined,
@@ -467,6 +572,7 @@ async function importOne(item: NormalizedAvitoItem) {
       lastError: item.status === VariantStatus.ERROR ? "Imported Avito item has error/rejected status" : null
     },
     update: {
+      productId: product.id,
       title: item.title,
       color: item.color === UNKNOWN_VALUE ? undefined : item.color,
       size: item.size === UNKNOWN_VALUE ? undefined : item.size,
@@ -496,6 +602,13 @@ async function importOne(item: NormalizedAvitoItem) {
       })),
       skipDuplicates: true
     });
+  }
+
+  if (previousProductId && previousProductId !== product.id && previousProductId.startsWith("avito-")) {
+    const remainingVariants = await prisma.variant.count({ where: { productId: previousProductId } });
+    if (remainingVariants === 0) {
+      await prisma.product.delete({ where: { id: previousProductId } });
+    }
   }
 
   return { productId: product.id, variantId: variant.id, avitoItemId: item.avitoItemId };

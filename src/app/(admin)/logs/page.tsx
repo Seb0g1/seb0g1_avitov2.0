@@ -4,6 +4,28 @@ import { serializeActionLog, serializeErrorLog } from "@/server/modules/products
 
 export const dynamic = "force-dynamic";
 
+const actionMessages: Record<string, string> = {
+  "Product created": "Товар создан",
+  "Product with variants created": "Товар с вариантами создан",
+  "Product updated": "Товар обновлен",
+  "Product supplier link updated": "Ссылка поставщика товара обновлена",
+  "Variant created": "Вариант создан",
+  "Variant updated": "Вариант обновлен",
+  "Variant supplier link updated": "Ссылка поставщика варианта обновлена",
+  "Variant duplicated": "Вариант продублирован",
+  "Variant deleted": "Вариант удален",
+  "Product deleted": "Товар удален",
+  "Product unpublished from Avito": "Товар снят с Avito",
+  "Variant statuses updated": "Статусы вариантов обновлены",
+  "Variant descriptions regenerated": "Описания вариантов сгенерированы заново",
+  "Publication job completed": "Задача публикации завершена",
+  "Seed data created": "Тестовые данные созданы"
+};
+
+function translateAction(message: string) {
+  return actionMessages[message] ?? message;
+}
+
 export default async function LogsPage() {
   const logs = await getLogs();
   const actions = logs.actions.map(serializeActionLog);
@@ -27,7 +49,7 @@ export default async function LogsPage() {
           <div className="log-list">
             {actions.map((log) => (
               <div className="log-item" key={log.id}>
-                <strong>{log.message}</strong>
+                <strong>{translateAction(log.message)}</strong>
                 <div className="muted">{new Date(log.createdAt).toLocaleString("ru-RU")}</div>
               </div>
             ))}

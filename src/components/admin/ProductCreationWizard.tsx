@@ -2,7 +2,29 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Eye, ImagePlus, Link as LinkIcon, Plus, Save, Trash2, Upload } from "lucide-react";
+import {
+  Copy,
+  Eye,
+  ImagePlus,
+  Link as LinkIcon,
+  ListChecks,
+  Plus,
+  Save,
+  Shirt,
+  Sparkles,
+  Trash2,
+  Upload
+} from "lucide-react";
+import {
+  clothingMaterialOptions,
+  clothingSizeOptions,
+  defaultAdType,
+  defaultClothingCondition,
+  defaultClothingItem,
+  defaultClothingMaterials,
+  formatClothingMaterials,
+  maxClothingMaterials
+} from "@/lib/avitoOptions";
 import type { ProductDto } from "@/types/catalog";
 
 type LocalPhoto = {
@@ -14,24 +36,20 @@ type LocalPhoto = {
 type ColorGroupDraft = {
   id: string;
   color: string;
+  manufacturerColor: string;
   sizes: string[];
   photos: LocalPhoto[];
 };
 
-const sizeOptions = [
-  { value: "46 (S)", code: "S" },
-  { value: "48 (M)", code: "M" },
-  { value: "50 (L)", code: "L" },
-  { value: "54 (XL)", code: "XL" },
-  { value: "56 (2XL)", code: "2XL" }
-] as const;
-
 const defaultColors = ["Белый", "Черный", "Серый", "Бежевый"];
+const conditionOptions = ["Новое с биркой", "Отличное", "Хорошее", "Удовлетворительное"];
+const adTypeOptions = ["Товар приобретён на продажу", "Личная вещь"];
 
 function emptyColorGroup(color = ""): ColorGroupDraft {
   return {
     id: crypto.randomUUID(),
     color,
+    manufacturerColor: color,
     sizes: ["48 (M)"],
     photos: []
   };
@@ -72,14 +90,14 @@ function colorStyle(color: string) {
 
 function previewDescription(input: {
   title: string;
-  material: string;
+  materials: string[];
   colors: string[];
   sizes: string[];
   color: string;
   size: string;
 }) {
   const title = input.title || "Название товара";
-  const material = input.material || "100% Хлопок (Premium качество)";
+  const material = formatClothingMaterials(input.materials);
   const colors = input.colors.join(", ") || input.color || "Цвет не указан";
   const sizes = input.sizes.join(", ") || input.size || "Размеры не указаны";
 
@@ -111,7 +129,11 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
   const [title, setTitle] = useState("");
   const [brand, setBrand] = useState("");
   const [baseCategory, setBaseCategory] = useState(initialCategories[0] ?? "Одежда, обувь, аксессуары");
-  const [material, setMaterial] = useState("100% Хлопок (Premium качество)");
+  const [materials, setMaterials] = useState<string[]>([...defaultClothingMaterials]);
+  const [adType, setAdType] = useState(defaultAdType);
+  const [condition, setCondition] = useState(defaultClothingCondition);
+  const [clothingItem, setClothingItem] = useState(defaultClothingItem);
+  const [multiItemName, setMultiItemName] = useState("");
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [supplierUrl, setSupplierUrl] = useState("");
@@ -125,6 +147,7 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
   const allSizes = uniqueFilled(colorGroups.flatMap((group) => group.sizes));
   const variantCount = colorGroups.reduce((count, group) => count + group.sizes.length, 0);
   const firstPhoto = activeGroup?.photos[0]?.previewUrl;
+  const effectiveMultiItemName = multiItemName.trim() || title.trim() || "Название мультиобъявления";
 
   const preview = useMemo(
     () => ({
@@ -132,14 +155,14 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
       price: formatPrice(price),
       description: previewDescription({
         title: title.trim(),
-        material: material.trim(),
+        materials,
         colors: allColors,
         sizes: allSizes,
         color: activeGroup?.color ?? "",
         size: activeGroup?.sizes[0] ?? ""
       })
     }),
-    [activeGroup?.color, activeGroup?.sizes, allColors, allSizes, material, price, title]
+    [activeGroup?.color, activeGroup?.sizes, allColors, allSizes, materials, price, title]
   );
 
   function updateColorGroup(id: string, patch: Partial<ColorGroupDraft>) {
@@ -149,7 +172,8 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
   }
 
   function addColorGroup(color = "") {
-    const next = emptyColorGroup(color || defaultColors.find((value) => !allColors.includes(value)) || "");
+    const nextColor = color || defaultColors.find((value) => !allColors.includes(value)) || "";
+    const next = emptyColorGroup(nextColor);
     setColorGroups((current) => [...current, next]);
     setActiveGroupId(next.id);
   }
@@ -163,7 +187,8 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
     const next = {
       ...source,
       id: crypto.randomUUID(),
-      color: `${source.color} copy`,
+      color: `${source.color} копия`,
+      manufacturerColor: `${source.manufacturerColor || source.color} копия`,
       photos: source.photos.map((photo) => ({
         ...photo,
         id: crypto.randomUUID()
@@ -190,6 +215,23 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
         ? group.sizes.filter((value) => value !== size)
         : [...group.sizes, size]
     });
+  }
+
+  function toggleMaterial(material: string) {
+    if (materials.includes(material)) {
+      if (materials.length === 1) {
+        return;
+      }
+      setMaterials((current) => current.filter((value) => value !== material));
+      return;
+    }
+
+    if (materials.length >= maxClothingMaterials) {
+      setMessage(`Можно выбрать не больше ${maxClothingMaterials} материалов.`);
+      return;
+    }
+
+    setMaterials((current) => [...current, material]);
   }
 
   function addPhotos(groupId: string, files: FileList | File[]) {
@@ -242,6 +284,7 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
     const normalizedGroups = colorGroups
       .map((group) => ({
         color: group.color.trim(),
+        manufacturerColor: group.manufacturerColor.trim() || group.color.trim(),
         sizes: group.sizes
       }))
       .filter((group) => group.color && group.sizes.length > 0);
@@ -259,7 +302,12 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
         title,
         brand,
         baseCategory,
-        material,
+        material: formatClothingMaterials(materials),
+        materials,
+        adType,
+        condition,
+        clothingItem,
+        multiItemName: effectiveMultiItemName,
         price,
         quantity,
         supplierUrl,
@@ -290,35 +338,41 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
   }
 
   return (
-    <form className="creation-shell" onSubmit={submit}>
-      <header className="creation-header">
+    <form className="creation-shell avito-form" onSubmit={submit}>
+      <header className="creation-header avito-creation-header">
         <div>
-          <p className="eyebrow">Avito multi-listing builder</p>
-          <h1>Создать мультиобъявление</h1>
+          <p className="eyebrow">Мультиобъявление Avito</p>
+          <h1>Создать объявление</h1>
         </div>
         <div className="toolbar" style={{ marginBottom: 0 }}>
           {message ? <span className="status ERROR">{message}</span> : null}
+          <span className="status DRAFT">Черновик после создания</span>
           <button className="button primary" type="submit" disabled={isSaving}>
             <Save size={18} aria-hidden />
-            {isSaving ? "Создаем..." : "Создать товар"}
+            {isSaving ? "Создаем..." : "Создать мультиобъявление"}
           </button>
         </div>
       </header>
 
       <div className="creation-layout wide-preview">
         <div className="creation-main">
-          <section className="wizard-section">
+          <section className="wizard-section avito-step">
             <div className="section-title">
               <span className="step-badge">1</span>
-              <h2>Карточка товара</h2>
+              <h2>Карточка объявления</h2>
             </div>
             <div className="form-grid">
               <label>
-                Название
+                Название объявления
                 <input
                   className="field strong-field"
                   value={title}
-                  onChange={(event) => setTitle(event.target.value)}
+                  onChange={(event) => {
+                    setTitle(event.target.value);
+                    if (!multiItemName.trim()) {
+                      setMultiItemName(event.target.value);
+                    }
+                  }}
                   placeholder="Футболка Acne Studios"
                   required
                 />
@@ -332,7 +386,7 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                   placeholder="Acne Studios"
                 />
               </label>
-              <label>
+              <label className="span-full">
                 Категория Avito
                 <select
                   className="select"
@@ -346,40 +400,6 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                     </option>
                   ))}
                 </select>
-              </label>
-              <label>
-                Материал
-                <input
-                  className="field"
-                  value={material}
-                  onChange={(event) => setMaterial(event.target.value)}
-                  placeholder="100% Хлопок (Premium качество)"
-                  required
-                />
-              </label>
-              <label>
-                Цена
-                <input
-                  className="field"
-                  value={price}
-                  onChange={(event) => setPrice(event.target.value)}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="2199"
-                  required
-                />
-              </label>
-              <label>
-                Количество на размер
-                <input
-                  className="field"
-                  value={quantity}
-                  onChange={(event) => setQuantity(event.target.value)}
-                  type="number"
-                  min="1"
-                  required
-                />
               </label>
               <label className="span-full">
                 Ссылка поставщика МойСклад
@@ -395,10 +415,48 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
             </div>
           </section>
 
-          <section className="wizard-section">
+          <section className="wizard-section avito-step">
             <div className="section-title">
               <span className="step-badge">2</span>
-              <h2>Цвета и размеры</h2>
+              <h2>Мультиобъявление</h2>
+            </div>
+            <div className="form-grid">
+              <label className="span-full">
+                Название мультиобъявления
+                <input
+                  className="field strong-field"
+                  value={multiItemName}
+                  onChange={(event) => setMultiItemName(event.target.value)}
+                  placeholder="Покупатель его не увидит"
+                />
+              </label>
+              <label>
+                Вид объявления
+                <select className="select" value={adType} onChange={(event) => setAdType(event.target.value)}>
+                  {adTypeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Состояние
+                <select className="select" value={condition} onChange={(event) => setCondition(event.target.value)}>
+                  {conditionOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section className="wizard-section avito-step">
+            <div className="section-title">
+              <span className="step-badge">3</span>
+              <h2>Внешний вид</h2>
             </div>
 
             <div className="color-group-list">
@@ -409,16 +467,31 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                   onFocus={() => setActiveGroupId(group.id)}
                   onMouseEnter={() => setActiveGroupId(group.id)}
                 >
-                  <div className="color-group-head">
+                  <div className="color-group-head avito-color-head">
                     <div className="variant-row-index">{index + 1}</div>
                     <label>
                       Цвет
                       <input
                         className="field"
                         value={group.color}
-                        onChange={(event) => updateColorGroup(group.id, { color: event.target.value })}
-                        placeholder="Белый"
+                        onChange={(event) =>
+                          updateColorGroup(group.id, {
+                            color: event.target.value,
+                            manufacturerColor:
+                              group.manufacturerColor === group.color ? event.target.value : group.manufacturerColor
+                          })
+                        }
+                        placeholder="Черный"
                         required
+                      />
+                    </label>
+                    <label>
+                      Цвет от производителя
+                      <input
+                        className="field"
+                        value={group.manufacturerColor}
+                        onChange={(event) => updateColorGroup(group.id, { manufacturerColor: event.target.value })}
+                        placeholder="Черный"
                       />
                     </label>
                     <div className="color-actions">
@@ -442,17 +515,20 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                     </div>
                   </div>
 
-                  <div className="size-picker" aria-label={`Размеры для ${group.color || "цвета"}`}>
-                    {sizeOptions.map((size) => (
-                      <label className="size-chip" key={size.value}>
-                        <input
-                          type="checkbox"
-                          checked={group.sizes.includes(size.value)}
-                          onChange={() => toggleSize(group.id, size.value)}
-                        />
-                        <span>{size.value}</span>
-                      </label>
-                    ))}
+                  <div>
+                    <div className="field-caption">Размеры в наличии</div>
+                    <div className="size-picker" aria-label={`Размеры для ${group.color || "цвета"}`}>
+                      {clothingSizeOptions.map((size) => (
+                        <label className="size-chip" key={size.value}>
+                          <input
+                            type="checkbox"
+                            checked={group.sizes.includes(size.value)}
+                            onChange={() => toggleSize(group.id, size.value)}
+                          />
+                          <span>{size.value}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
                   <label
@@ -464,7 +540,7 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                     }}
                   >
                     <Upload size={20} aria-hidden />
-                    Фото этого цвета
+                    Фото только для цвета “{group.color || "новый цвет"}”
                     <input
                       type="file"
                       multiple
@@ -523,6 +599,91 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
               ))}
             </div>
           </section>
+
+          <section className="wizard-section avito-step">
+            <div className="section-title">
+              <span className="step-badge">4</span>
+              <h2>Характеристики</h2>
+            </div>
+            <div className="form-grid">
+              <label>
+                Предмет одежды
+                <input
+                  className="field"
+                  value={clothingItem}
+                  onChange={(event) => setClothingItem(event.target.value)}
+                  placeholder="Футболка"
+                  required
+                />
+              </label>
+              <div className="span-full">
+                <div className="field-caption">Материал основной части</div>
+                <div className="material-picker">
+                  {clothingMaterialOptions.map((material) => {
+                    const checked = materials.includes(material);
+                    return (
+                      <button
+                        className={`material-chip ${checked ? "selected" : ""}`}
+                        type="button"
+                        key={material}
+                        onClick={() => toggleMaterial(material)}
+                        aria-pressed={checked}
+                      >
+                        {material}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="muted small-note">
+                  Выберите до {maxClothingMaterials}. Эти значения попадут в описание и фид Avito.
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="wizard-section avito-step">
+            <div className="section-title">
+              <span className="step-badge">5</span>
+              <h2>Подробности и цена</h2>
+            </div>
+            <div className="form-grid">
+              <label>
+                Цена
+                <input
+                  className="field"
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="2199"
+                  required
+                />
+              </label>
+              <label>
+                Количество на выбранный размер
+                <input
+                  className="field"
+                  value={quantity}
+                  onChange={(event) => setQuantity(event.target.value)}
+                  type="number"
+                  min="1"
+                  required
+                />
+              </label>
+              <div className="span-full">
+                <div className="field-caption">Описание объявления</div>
+                <div className="description-toolbar" aria-hidden>
+                  <span className="tool-pill active">B</span>
+                  <span className="tool-pill">•</span>
+                  <span className="tool-pill">1.</span>
+                  <span className="tool-pill">↶</span>
+                  <span className="tool-pill">↷</span>
+                </div>
+                <pre className="description-preview description-editor-preview">{preview.description}</pre>
+              </div>
+            </div>
+          </section>
         </div>
 
         <aside className="preview-panel avito-preview-panel">
@@ -551,6 +712,11 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
               <div className="preview-price">{preview.price}</div>
 
               <div className="avito-option-block">
+                <strong>Мультиобъявление</strong>
+                <span className="muted">{effectiveMultiItemName}</span>
+              </div>
+
+              <div className="avito-option-block">
                 <strong>Цвет: {activeGroup?.color || "не указан"}</strong>
                 <div className="color-tile-row">
                   {colorGroups.map((group) => (
@@ -575,7 +741,7 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
               <div className="avito-option-block">
                 <strong>Размер</strong>
                 <div className="size-preview-row">
-                  {sizeOptions.map((size) => {
+                  {clothingSizeOptions.map((size) => {
                     const available = activeGroup?.sizes.includes(size.value);
                     return (
                       <span className={`size-preview ${available ? "available" : "disabled"}`} key={size.value}>
@@ -586,19 +752,19 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                 </div>
               </div>
 
-              <pre className="description-preview">{preview.description}</pre>
               <div className="preview-checklist">
                 <div>
-                  <strong>{colorGroups.length}</strong>
-                  <span> цветов</span>
+                  <Shirt size={14} aria-hidden />
+                  <strong>{formatClothingMaterials(materials)}</strong>
                 </div>
                 <div>
+                  <ListChecks size={14} aria-hidden />
                   <strong>{variantCount}</strong>
                   <span> вариантов</span>
                 </div>
                 <div>
-                  <strong>DRAFT</strong>
-                  <span> после создания</span>
+                  <Sparkles size={14} aria-hidden />
+                  <strong>Мульти</strong>
                 </div>
               </div>
             </div>

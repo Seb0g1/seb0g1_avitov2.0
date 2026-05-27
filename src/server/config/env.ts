@@ -14,13 +14,17 @@ const envSchema = z.object({
   AVITO_ITEMS_PATH: z.string().default("/items"),
   AVITO_ITEMS_LIST_PATH: z.string().default("/core/v1/items"),
   AVITO_ITEM_DETAIL_PATH: z.string().default("/items/v2/item/{item_id}"),
+  AVITO_ITEM_UNPUBLISH_PATH: z.string().default("/core/v1/accounts/{account_id}/items/{item_id}/unpublish"),
+  AVITO_ITEM_UNPUBLISH_METHOD: z
+    .enum(["POST", "DELETE", "PATCH", "PUT"])
+    .default("POST"),
   AVITO_IMPORT_FETCH_DETAILS: z
     .string()
     .default("false")
     .transform((value) => value === "true"),
   AVITO_STATUS_PATH: z.string().optional(),
   AVITO_REPORT_URL: z.string().optional(),
-  APP_PUBLIC_URL: z.string().url().default("http://localhost:3000"),
+  APP_PUBLIC_URL: z.string().url().default("http://localhost:3433"),
   UPLOAD_DIR: z.string().default("./uploads"),
   EXPORT_DIR: z.string().default("./exports"),
   FEED_PUBLIC_TOKEN: z.string().default("dev-feed-token"),

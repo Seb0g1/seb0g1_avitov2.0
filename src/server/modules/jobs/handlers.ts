@@ -47,12 +47,17 @@ export async function processPublicationJob(payload: PublicationPayload) {
           attributes: {
             brand: row.brand,
             color: row.color,
+            manufacturerColor: row.manufacturerColor,
             size: row.size,
             quantity: row.quantity,
             material: row.material,
+            materials: row.materials,
             article: row.article,
             multiItem: row.multiItem,
             multiItemGroup: row.multiItemGroup,
+            multiItemName: row.multiItemName,
+            adType: row.adType,
+            clothingItem: row.clothingItem,
             condition: row.condition,
             goodsType: row.goodsType,
             region: env.STORE_REGION

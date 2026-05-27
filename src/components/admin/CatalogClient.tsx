@@ -4,9 +4,25 @@ import { FormEvent, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PublicationMode, VariantStatus } from "@prisma/client";
-import { CheckSquare, Download, ExternalLink, FileSpreadsheet, Plus, RefreshCw, Rocket, Search } from "lucide-react";
-import type { ProductDto, VariantDto } from "@/types/catalog";
-import { StatusBadge } from "./StatusBadge";
+import {
+  CheckSquare,
+  Download,
+  ExternalLink,
+  FileSpreadsheet,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Rocket,
+  Search,
+  Trash2
+} from "lucide-react";
+import type { ProductDto } from "@/types/catalog";
+import {
+  buildCatalogProductRows,
+  variantIdsForSelectedProducts,
+  type CatalogProductRow
+} from "./catalogRows";
+import { StatusBadge, variantStatusLabels } from "./StatusBadge";
 
 const statuses: VariantStatus[] = [
   "DRAFT",
@@ -18,12 +34,29 @@ const statuses: VariantStatus[] = [
   "REMOVED"
 ];
 
-function formatPrice(value: string) {
+function formatPrice(value: number) {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
     currency: "RUB",
     maximumFractionDigits: 0
-  }).format(Number(value));
+  }).format(value);
+}
+
+function priceRange(row: CatalogProductRow) {
+  if (row.variants.length === 0) {
+    return "—";
+  }
+  if (row.minPrice === row.maxPrice) {
+    return formatPrice(row.minPrice);
+  }
+  return `${formatPrice(row.minPrice)} – ${formatPrice(row.maxPrice)}`;
+}
+
+function compactList(values: string[]) {
+  if (values.length === 0) {
+    return "—";
+  }
+  return values.join(", ");
 }
 
 export function CatalogClient({ products }: { products: ProductDto[] }) {
@@ -33,17 +66,10 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const variants = useMemo(
-    () =>
-      products.flatMap((product) =>
-        product.variants.map((variant) => ({
-          ...variant,
-          productTitle: product.title,
-          productBrand: product.brand,
-          productDescription: product.baseDescription
-        }))
-      ),
-    [products]
+  const rows = useMemo(() => buildCatalogProductRows(products), [products]);
+  const selectedVariantIds = useMemo(
+    () => variantIdsForSelectedProducts(products, selected),
+    [products, selected]
   );
 
   function toggle(id: string) {
@@ -73,33 +99,58 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
   }
 
   async function bulkStatus(status: VariantStatus) {
-    const variantIds = [...selected];
-    if (variantIds.length === 0) {
-      setMessage("Выберите варианты.");
+    if (selectedVariantIds.length === 0) {
+      setMessage("Выберите товары.");
       return;
     }
     const response = await fetch("/api/variants/bulk-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ variantIds, status })
+      body: JSON.stringify({ variantIds: selectedVariantIds, status })
     });
-    setMessage(response.ok ? "Статусы обновлены." : "Не удалось обновить статусы.");
+    setMessage(response.ok ? "Статусы вариантов обновлены." : "Не удалось обновить статусы.");
     router.refresh();
   }
 
   async function publish(mode: PublicationMode) {
-    const variantIds = [...selected];
-    if (variantIds.length === 0) {
-      setMessage("Выберите варианты для публикации.");
+    if (selectedVariantIds.length === 0) {
+      setMessage("Выберите товары для публикации.");
       return;
     }
 
     const response = await fetch("/api/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ variantIds, mode })
+      body: JSON.stringify({ variantIds: selectedVariantIds, mode })
     });
     setMessage(response.ok ? "Публикация поставлена в очередь." : "Не удалось поставить публикацию в очередь.");
+    startTransition(() => router.refresh());
+  }
+
+  async function deleteProduct(row: CatalogProductRow, withAvitoUnpublish: boolean) {
+    const avitoCount = row.avitoItemIds.length;
+    const confirmText = withAvitoUnpublish
+      ? `Снять с Avito ${avitoCount} объявлений и удалить товар “${row.product.title}” из админки? Вариантов: ${row.variants.length}.`
+      : `Удалить товар “${row.product.title}” только из админки? Вариантов: ${row.variants.length}.`;
+
+    if (!window.confirm(confirmText)) {
+      return;
+    }
+
+    const response = await fetch(
+      `/api/products/${row.product.id}${withAvitoUnpublish ? "?avito=unpublish" : ""}`,
+      { method: "DELETE" }
+    );
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { message?: string } | null;
+      setMessage(body?.message ?? "Не удалось удалить товар.");
+      return;
+    }
+
+    const next = new Set(selected);
+    next.delete(row.product.id);
+    setSelected(next);
+    setMessage(withAvitoUnpublish ? "Товар снят с Avito и удален." : "Товар удален из админки.");
     startTransition(() => router.refresh());
   }
 
@@ -163,7 +214,7 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
             <option value="">Все</option>
             {statuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {variantStatusLabels[status]}
               </option>
             ))}
           </select>
@@ -190,15 +241,15 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
         </button>
         <button className="button primary" type="button" onClick={() => publish("AUTOLOAD_XML")}>
           <Rocket size={18} aria-hidden />
-          XML publish
+          Выгрузить XML
         </button>
         <button className="button" type="button" onClick={() => publish("AUTOLOAD_CSV")}>
           <Download size={18} aria-hidden />
-          CSV publish
+          Выгрузить CSV
         </button>
         <button className="button" type="button" onClick={() => publish("ITEMS_API")}>
           <Rocket size={18} aria-hidden />
-          Items API
+          Avito API
         </button>
         <a className="button" href="/api/exports/catalog.xlsx">
           <FileSpreadsheet size={18} aria-hidden />
@@ -228,58 +279,63 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
             <tr>
               <th />
               <th>Товар</th>
-              <th>Вариант</th>
-              <th>Цена</th>
-              <th>Остаток</th>
-              <th>Статус</th>
-              <th>Фото</th>
+              <th>Варианты</th>
+              <th>Цена / остаток</th>
+              <th>Статусы</th>
+              <th>Фото / Avito</th>
               <th>Поставщик</th>
-              <th>Avito ID</th>
+              <th>Действия</th>
             </tr>
           </thead>
           <tbody>
-            {variants.map((variant: VariantDto & {
-              productTitle: string;
-              productBrand: string | null;
-              productDescription: string | null;
-            }) => (
-              <tr key={variant.id}>
+            {rows.map((row) => (
+              <tr key={row.product.id}>
                 <td>
                   <input
-                    aria-label={`Выбрать ${variant.title}`}
+                    aria-label={`Выбрать ${row.product.title}`}
                     type="checkbox"
-                    checked={selected.has(variant.id)}
-                    onChange={() => toggle(variant.id)}
+                    checked={selected.has(row.product.id)}
+                    onChange={() => toggle(row.product.id)}
                   />
                 </td>
                 <td>
-                  <Link href={`/products/${variant.productId}`}>
-                    <strong>{variant.productTitle}</strong>
+                  <Link href={`/products/${row.product.id}`}>
+                    <strong>{row.product.title}</strong>
                   </Link>
-                  <div className="muted">{variant.productBrand ?? "Без бренда"}</div>
-                  {variant.productDescription ? (
-                    <div className="description-clamp">{variant.productDescription}</div>
-                  ) : null}
+                  <div className="muted">{row.product.brand ?? "Без бренда"}</div>
+                  {row.description ? <div className="description-clamp">{row.description}</div> : null}
                 </td>
                 <td>
-                  <strong>{variant.title}</strong>
-                  <div className="muted">
-                    {variant.color} · {variant.size}
+                  <strong>{row.variants.length} вариантов</strong>
+                  <div className="chip-line">
+                    {row.colors.map((color) => (
+                      <span className="data-chip" key={color}>{color}</span>
+                    ))}
                   </div>
-                  {variant.description ? (
-                    <div className="description-clamp">{variant.description}</div>
-                  ) : null}
+                  <div className="muted">{compactList(row.sizes)}</div>
                 </td>
-                <td>{formatPrice(variant.price)}</td>
-                <td>{variant.quantity}</td>
                 <td>
-                  <StatusBadge status={variant.status} />
-                  {variant.lastError ? <div className="muted">{variant.lastError}</div> : null}
+                  <strong>{priceRange(row)}</strong>
+                  <div className="muted">Остаток: {row.totalQuantity}</div>
                 </td>
-                <td>{variant.photos.length}</td>
                 <td>
-                  {variant.effectiveSupplier?.url ? (
-                    <a className="button compact-button" href={variant.effectiveSupplier.url} target="_blank" rel="noreferrer">
+                  <div className="status-stack">
+                    {row.statusCounts.map((entry) => (
+                      <span key={entry.status} className="status-count">
+                        <StatusBadge status={entry.status} />
+                        <span className="muted">× {entry.count}</span>
+                      </span>
+                    ))}
+                    {row.statusCounts.length === 0 ? <span className="muted">Нет вариантов</span> : null}
+                  </div>
+                </td>
+                <td>
+                  <div>Фото: {row.photoCount}</div>
+                  <div className="muted">Avito ID: {row.avitoItemIds.length}</div>
+                </td>
+                <td>
+                  {row.supplier?.url ? (
+                    <a className="button compact-button" href={row.supplier.url} target="_blank" rel="noreferrer">
                       <ExternalLink size={16} aria-hidden />
                       Заказать
                     </a>
@@ -287,13 +343,38 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
                     <span className="muted">—</span>
                   )}
                 </td>
-                <td>{variant.avitoItemId ?? "—"}</td>
+                <td>
+                  <div className="row-actions">
+                    <Link className="button compact-button" href={`/products/${row.product.id}`}>
+                      <Pencil size={16} aria-hidden />
+                      Открыть
+                    </Link>
+                    <button
+                      className="button compact-button danger"
+                      type="button"
+                      onClick={() => deleteProduct(row, false)}
+                    >
+                      <Trash2 size={16} aria-hidden />
+                      Из админки
+                    </button>
+                    <button
+                      className="button compact-button danger"
+                      type="button"
+                      onClick={() => deleteProduct(row, true)}
+                      disabled={row.avitoItemIds.length === 0}
+                      title={row.avitoItemIds.length ? "Снять с Avito и удалить" : "Нет Avito ID для снятия"}
+                    >
+                      <Trash2 size={16} aria-hidden />
+                      С Avito
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
-            {variants.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="muted">
-                  Нет вариантов по текущим фильтрам.
+                <td colSpan={8} className="muted">
+                  Нет товаров по текущим фильтрам.
                 </td>
               </tr>
             ) : null}

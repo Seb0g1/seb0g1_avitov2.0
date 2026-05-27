@@ -34,10 +34,21 @@ Seed login defaults to `ADMIN_EMAIL` and `ADMIN_PASSWORD` when provided. If `ADM
 
 ## Key URLs
 
-- Admin: `http://localhost:3000`
+- Admin: `http://localhost:3433`
 - Avito XML feed: `/feed/avito.xml?token=FEED_PUBLIC_TOKEN`
 - Avito CSV feed: `/feed/avito.csv?token=FEED_PUBLIC_TOKEN`
 - Excel export: `/api/exports/catalog.xlsx`
+
+## Production Port
+
+The app is configured to run on port `3433`:
+
+```bash
+npm run build
+npm run start
+```
+
+For nginx deployment on `https://amsterdam2.sebog1.ru`, proxy traffic to `127.0.0.1:3433` and set `APP_PUBLIC_URL="https://amsterdam2.sebog1.ru"` on the server.
 
 ## Modules
 

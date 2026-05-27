@@ -5,6 +5,25 @@ import { serializeJob } from "@/server/modules/products/serialize";
 
 export const dynamic = "force-dynamic";
 
+const jobTypeLabels = {
+  PUBLICATION: "Публикация",
+  EXPORT: "Экспорт",
+  STATUS_SYNC: "Синхронизация статусов"
+} as const;
+
+const jobStatusLabels = {
+  QUEUED: "В очереди",
+  RUNNING: "В работе",
+  COMPLETED: "Готово",
+  FAILED: "Ошибка"
+} as const;
+
+const modeLabels = {
+  AUTOLOAD_XML: "Автозагрузка XML",
+  AUTOLOAD_CSV: "Автозагрузка CSV",
+  ITEMS_API: "Avito API"
+} as const;
+
 export default async function JobsPage() {
   const jobs = (await listJobs()).map(serializeJob);
 
@@ -22,7 +41,7 @@ export default async function JobsPage() {
         <table>
           <thead>
             <tr>
-              <th>Job</th>
+              <th>Задача</th>
               <th>Тип</th>
               <th>Режим</th>
               <th>Статус</th>
@@ -37,9 +56,9 @@ export default async function JobsPage() {
                 <td>
                   <Activity size={16} aria-hidden /> {job.id.slice(0, 10)}
                 </td>
-                <td>{job.type}</td>
-                <td>{job.mode ?? "—"}</td>
-                <td>{job.status}</td>
+                <td>{jobTypeLabels[job.type]}</td>
+                <td>{job.mode ? modeLabels[job.mode] : "—"}</td>
+                <td>{jobStatusLabels[job.status]}</td>
                 <td>{job.attempts}</td>
                 <td className="muted">{job.error ?? "—"}</td>
                 <td>{new Date(job.queuedAt).toLocaleString("ru-RU")}</td>

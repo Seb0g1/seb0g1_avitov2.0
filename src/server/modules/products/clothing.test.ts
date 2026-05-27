@@ -25,7 +25,7 @@ describe("clothing helpers", () => {
   it("generates the Tochka Style description with variant parameters", () => {
     const description = buildVariantDescription({
       title: "Футболка Ami Paris XP",
-      material: "100% Хлопок",
+      materials: ["Хлопок"],
       color: "Белый",
       size: "48 (M)",
       article: "AV-FUTBOLKAAMIPARISXP-BELYY-M",
@@ -34,9 +34,23 @@ describe("clothing helpers", () => {
     });
 
     expect(description).toContain("Футболка Ami Paris XP — PREMIUM качество");
-    expect(description).toContain("Материал: 100% Хлопок");
+    expect(description).toContain("Материал: Хлопок");
     expect(description).toContain("Цвета: Белый, Черный");
     expect(description).toContain("Размер: 48 (M)");
     expect(description).toContain("Артикул: AV-FUTBOLKAAMIPARISXP-BELYY-M");
+  });
+
+  it("normalizes legacy material text to Avito material choices", () => {
+    const description = buildVariantDescription({
+      title: "Футболка",
+      material: "100% Хлопок (Premium качество)",
+      color: "Черный",
+      size: "50 (L)",
+      article: "AV-FUTBOLKA-CHERNYI-L",
+      colors: ["Черный"],
+      sizes: ["50 (L)"]
+    });
+
+    expect(description).toContain("Материал: Хлопок");
   });
 });

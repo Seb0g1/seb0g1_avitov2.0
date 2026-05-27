@@ -4,8 +4,17 @@ import { DragEvent, FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { VariantStatus } from "@prisma/client";
 import { Copy, ExternalLink, Save, Sparkles, Trash2, Upload } from "lucide-react";
+import {
+  clothingMaterialOptions,
+  defaultAdType,
+  defaultClothingCondition,
+  defaultClothingItem,
+  formatClothingMaterials,
+  maxClothingMaterials,
+  normalizeClothingMaterials
+} from "@/lib/avitoOptions";
 import type { ProductDto, VariantDto } from "@/types/catalog";
-import { StatusBadge } from "./StatusBadge";
+import { StatusBadge, variantStatusLabels } from "./StatusBadge";
 
 const statuses: VariantStatus[] = [
   "DRAFT",
@@ -47,10 +56,31 @@ function variantBody(formData: FormData) {
 export function ProductEditor({ product }: { product: ProductDto }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
-  const material =
-    typeof product.avitoAttributes?.material === "string"
-      ? product.avitoAttributes.material
-      : "100% Хлопок (Premium качество)";
+  const attributes = product.avitoAttributes ?? {};
+  const [selectedMaterials, setSelectedMaterials] = useState(() =>
+    normalizeClothingMaterials(attributes.materials, attributes.material)
+  );
+  const adType = String(attributes.adType ?? defaultAdType);
+  const condition = String(attributes.condition ?? defaultClothingCondition);
+  const clothingItem = String(attributes.clothingItem ?? defaultClothingItem);
+  const multiItemName = String(attributes.multiItemName ?? product.title);
+
+  function toggleProductMaterial(material: string) {
+    if (selectedMaterials.includes(material)) {
+      if (selectedMaterials.length === 1) {
+        return;
+      }
+      setSelectedMaterials((current) => current.filter((value) => value !== material));
+      return;
+    }
+
+    if (selectedMaterials.length >= maxClothingMaterials) {
+      setMessage(`Можно выбрать не больше ${maxClothingMaterials} материалов.`);
+      return;
+    }
+
+    setSelectedMaterials((current) => [...current, material]);
+  }
 
   async function updateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,7 +94,12 @@ export function ProductEditor({ product }: { product: ProductDto }) {
         supplierUrl: formData.get("supplierUrl"),
         supplierName: formData.get("supplierName"),
         avitoAttributes: {
-          material: formData.get("material")
+          material: formatClothingMaterials(selectedMaterials),
+          materials: selectedMaterials,
+          adType: formData.get("adType"),
+          condition: formData.get("condition"),
+          clothingItem: formData.get("clothingItem"),
+          multiItemName: formData.get("multiItemName")
         }
       });
       setMessage("Товар обновлен.");
@@ -140,7 +175,7 @@ export function ProductEditor({ product }: { product: ProductDto }) {
       <section className="editor-section">
         <form className="grid" onSubmit={updateProduct}>
           <div>
-            <p className="eyebrow">Parent product</p>
+            <p className="eyebrow">Товар Avito</p>
             <h2>Карточка товара</h2>
           </div>
           <label>
@@ -156,9 +191,38 @@ export function ProductEditor({ product }: { product: ProductDto }) {
             <input className="field" name="baseCategory" defaultValue={product.baseCategory} required />
           </label>
           <label>
-            Материал
-            <input className="field" name="material" defaultValue={material} required />
+            Вид объявления
+            <input className="field" name="adType" defaultValue={adType} required />
           </label>
+          <label>
+            Состояние
+            <input className="field" name="condition" defaultValue={condition} required />
+          </label>
+          <label>
+            Предмет одежды
+            <input className="field" name="clothingItem" defaultValue={clothingItem} required />
+          </label>
+          <label>
+            Название мультиобъявления
+            <input className="field" name="multiItemName" defaultValue={multiItemName} required />
+          </label>
+          <div className="span-full">
+            <div className="field-caption">Материал основной части</div>
+            <div className="material-picker">
+              {clothingMaterialOptions.map((material) => (
+                <label className="material-check" key={material}>
+                  <input
+                    type="checkbox"
+                    name="materials"
+                    value={material}
+                    checked={selectedMaterials.includes(material)}
+                    onChange={() => toggleProductMaterial(material)}
+                  />
+                  <span>{material}</span>
+                </label>
+              ))}
+            </div>
+          </div>
           <label>
             Название поставщика
             <input className="field" name="supplierName" defaultValue={product.supplier?.name ?? ""} placeholder="МойСклад" />
@@ -201,7 +265,7 @@ export function ProductEditor({ product }: { product: ProductDto }) {
       <section className="editor-section">
         <div className="toolbar" style={{ justifyContent: "space-between" }}>
           <div>
-            <p className="eyebrow">Variations</p>
+            <p className="eyebrow">Варианты объявления</p>
             <h2>Цвета, размеры и фото</h2>
           </div>
           <StatusBadge status={product.variants.some((variant) => variant.status === "ERROR") ? "ERROR" : "READY"} />
@@ -210,15 +274,15 @@ export function ProductEditor({ product }: { product: ProductDto }) {
         <form className="form-grid three" onSubmit={createVariant}>
           <label>
             Название
-            <input className="field" name="title" placeholder={`${product.title} Black M`} required />
+            <input className="field" name="title" placeholder={`${product.title} Черный 48 (M)`} required />
           </label>
           <label>
             Цвет
-            <input className="field" name="color" placeholder="Black" required />
+            <input className="field" name="color" placeholder="Черный" required />
           </label>
           <label>
             Размер
-            <input className="field" name="size" placeholder="M" required />
+            <input className="field" name="size" placeholder="48 (M)" required />
           </label>
           <label>
             Цена
@@ -233,7 +297,7 @@ export function ProductEditor({ product }: { product: ProductDto }) {
             <select className="select" name="status" defaultValue="DRAFT">
               {statuses.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {variantStatusLabels[status]}
                 </option>
               ))}
             </select>
@@ -320,7 +384,7 @@ function VariantEditor({
           <select className="select" name="status" defaultValue={variant.status}>
             {statuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {variantStatusLabels[status]}
               </option>
             ))}
           </select>

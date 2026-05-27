@@ -12,11 +12,11 @@ import {
 } from "lucide-react";
 
 const links = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/catalog", label: "Catalog", icon: Boxes },
-  { href: "/jobs", label: "Jobs", icon: Activity },
-  { href: "/logs", label: "Logs", icon: FileCog },
-  { href: "/settings", label: "Settings", icon: Settings }
+  { href: "/dashboard", label: "Панель", icon: LayoutDashboard },
+  { href: "/catalog", label: "Каталог", icon: Boxes },
+  { href: "/jobs", label: "Задачи", icon: Activity },
+  { href: "/logs", label: "Журнал", icon: FileCog },
+  { href: "/settings", label: "Настройки", icon: Settings }
 ];
 
 export function Sidebar() {
@@ -35,7 +35,7 @@ export function Sidebar() {
         <div className="brand-mark">A</div>
         <div>
           <div>Avito Uploader</div>
-          <div className="muted">catalog admin</div>
+          <div className="muted">админ-каталог</div>
         </div>
       </div>
       <nav className="nav">

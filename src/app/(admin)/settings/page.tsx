@@ -17,23 +17,23 @@ export default function SettingsPage() {
       <section className="editor-section">
         <div className="toolbar">
           <KeyRound size={18} aria-hidden />
-          <h2>Avito OAuth2</h2>
+          <h2>Авторизация Avito OAuth2</h2>
         </div>
         <div className="form-grid">
           <label>
-            Client ID
+            Client ID Avito
             <input className="field" value={env.AVITO_CLIENT_ID ? "Настроен" : "Не настроен"} readOnly />
           </label>
           <label>
-            Client Secret
+            Client Secret Avito
             <input className="field" value={env.AVITO_CLIENT_SECRET ? "Настроен" : "Не настроен"} readOnly />
           </label>
           <label>
-            Base URL
+            Базовый URL
             <input className="field" value={env.AVITO_BASE_URL} readOnly />
           </label>
           <label>
-            Token path
+            Путь получения токена
             <input className="field" value={env.AVITO_TOKEN_PATH} readOnly />
           </label>
         </div>
@@ -42,14 +42,14 @@ export default function SettingsPage() {
       <section className="editor-section">
         <div className="toolbar">
           <Copy size={18} aria-hidden />
-          <h2>Feed URLs</h2>
+          <h2>Ссылки автозагрузки</h2>
         </div>
         <label>
-          XML autoload
+          XML-автозагрузка
           <input className="field" value={xmlFeed} readOnly />
         </label>
         <label style={{ marginTop: 12 }}>
-          CSV autoload
+          CSV-автозагрузка
           <input className="field" value={csvFeed} readOnly />
         </label>
       </section>
