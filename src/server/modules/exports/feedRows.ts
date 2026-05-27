@@ -1,5 +1,5 @@
 import { VariantStatus } from "@prisma/client";
-import { getClothingCategoryOption } from "@/lib/avitoOptions";
+import { getClothingCategoryOption, normalizeAvitoColor } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import {
@@ -270,9 +270,10 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const material = formatClothingMaterials(materials);
     const manufacturerColors = asRecord(attributes.manufacturerColors);
     const size = normalizeFeedSize(variant.size);
+    const color = normalizeAvitoColor(variant.color);
     const multiItemGroup = String(attributes.multiItemGroup ?? variant.productId);
     const variantKey = size
-      ? `${multiItemGroup}:${variant.color.trim().toLowerCase()}:${size}`
+      ? `${multiItemGroup}:${color.trim().toLowerCase()}:${size}`
       : "";
     const photos = variant.photos
       .map((photo) => photo.publicUrl)
@@ -287,7 +288,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       duplicate: Boolean(variantKey && seenVariantKeys.has(variantKey)),
       damagedValues: [
         variant.title,
-        variant.color,
+        color,
         variant.product.title,
         variant.product.baseCategory,
         variant.product.brand,
@@ -311,11 +312,11 @@ export async function getFeedRowsWithDiagnostics(options?: {
     }
     seenVariantKeys.add(variantKey);
 
-    const article = buildVariantArticle(variant.product.title, variant.color, size);
+    const article = buildVariantArticle(variant.product.title, color, size);
     const availableVariants = variant.product.variants
       .filter((productVariant) => productVariant.quantity > 0)
       .map((productVariant) => ({
-        color: productVariant.color,
+        color: normalizeAvitoColor(productVariant.color),
         size: normalizeFeedSize(productVariant.size)
       }))
       .filter(
@@ -365,7 +366,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
         buildVariantDescription({
           title: variant.product.title,
           materials,
-          color: variant.color,
+          color,
           size,
           article,
           colors,
@@ -380,13 +381,15 @@ export async function getFeedRowsWithDiagnostics(options?: {
       productSubtype,
       categorySpecificFields,
       multiItemName: String(attributes.multiItemName ?? variant.product.title),
-      manufacturerColor: String(manufacturerColors[variant.color] ?? variant.color),
+      manufacturerColor: normalizeAvitoColor(
+        manufacturerColors[variant.color] ?? manufacturerColors[color] ?? color
+      ),
       material,
       materials,
       multiItem: true,
       multiItemGroup,
       article,
-      color: variant.color,
+      color,
       size,
       price: Number(variant.price),
       quantity: variant.quantity,

@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { normalizeAvitoColor } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import type { FeedRow } from "./feedRows";
 
@@ -101,7 +102,7 @@ const hintRow = [
 ] as const;
 
 function normalizeTemplateColor(color: string) {
-  return color.trim().toLowerCase() === "черный" ? "Чёрный" : color;
+  return normalizeAvitoColor(color);
 }
 
 function avitoAddress(row: FeedRow) {

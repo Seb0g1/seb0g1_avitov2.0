@@ -1,6 +1,7 @@
 import { create } from "xmlbuilder2";
 import type { FeedRow } from "./feedRows";
 import { clothingFeedFieldMap } from "./fieldMap";
+import { sanitizeAvitoDescription } from "./description";
 
 export function buildAvitoXml(rows: FeedRow[]) {
   const root = create({ version: "1.0", encoding: "UTF-8" }).ele("Ads", {
@@ -25,7 +26,7 @@ export function buildAvitoXml(rows: FeedRow[]) {
 
     ad.ele("ContactMethod").txt(row.contactMethod);
     ad.ele("Title").txt(row.title);
-    ad.ele("Description").dat(row.description);
+    ad.ele("Description").dat(sanitizeAvitoDescription(row.description));
     ad.ele("Category").txt(row.category);
     ad.ele("Price").txt(String(Math.round(row.price)));
     ad.ele("GoodsType").txt(row.goodsType);

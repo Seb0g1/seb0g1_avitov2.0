@@ -8,5 +8,6 @@ tsconfig.tsbuildinfo
 .env.*.local
 /uploads
 /exports
+/data
 *.log
 prisma/dev.db

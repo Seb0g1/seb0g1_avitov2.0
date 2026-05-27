@@ -1,9 +1,14 @@
 import { Copy, KeyRound } from "lucide-react";
+import { ClothingCategoryTemplateImporter } from "@/components/admin/ClothingCategoryTemplateImporter";
 import { env } from "@/server/config/env";
+import { listClothingCategoryOptions } from "@/server/modules/avitoCategories/clothingTemplates";
 
-export default function SettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
   const xmlFeed = `${env.APP_PUBLIC_URL.replace(/\/$/, "")}/feed/avito.xml?token=${env.FEED_PUBLIC_TOKEN}`;
   const csvFeed = `${env.APP_PUBLIC_URL.replace(/\/$/, "")}/feed/avito.csv?token=${env.FEED_PUBLIC_TOKEN}`;
+  const clothingCategories = await listClothingCategoryOptions();
 
   return (
     <div className="grid">
@@ -53,6 +58,8 @@ export default function SettingsPage() {
           <input className="field" value={csvFeed} readOnly />
         </label>
       </section>
+
+      <ClothingCategoryTemplateImporter initialCategories={clothingCategories} />
     </div>
   );
 }

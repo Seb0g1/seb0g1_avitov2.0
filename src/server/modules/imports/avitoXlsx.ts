@@ -6,6 +6,7 @@ import {
   defaultClothingCondition,
   defaultClothingItem,
   getClothingCategoryOption,
+  normalizeAvitoColor,
   normalizeClothingMaterials
 } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
@@ -198,8 +199,7 @@ function normalizeStatus(value: string | null | undefined, avitoItemId: string |
 }
 
 function normalizeColor(value: string | null | undefined) {
-  const text = compactText(value);
-  return text.replace(/^Чёрный$/i, "Черный");
+  return normalizeAvitoColor(compactText(value));
 }
 
 function cleanProductTitle(title: string, multiItemName: string | null) {

@@ -7,13 +7,15 @@ import { Copy, ExternalLink, Save, Sparkles, Trash2, Upload } from "lucide-react
 import {
   clothingMaterialOptions,
   clothingCategoryOptions,
+  clothingColorOptions,
   defaultAdType,
   defaultClothingCategory,
   defaultClothingCondition,
   defaultClothingItem,
   formatClothingMaterials,
   maxClothingMaterials,
-  normalizeClothingMaterials
+  normalizeClothingMaterials,
+  type ClothingCategoryOption
 } from "@/lib/avitoOptions";
 import type { ProductDto, VariantDto } from "@/types/catalog";
 import { StatusBadge, variantStatusLabels } from "./StatusBadge";
@@ -55,7 +57,15 @@ function variantBody(formData: FormData) {
   };
 }
 
-export function ProductEditor({ product }: { product: ProductDto }) {
+export function ProductEditor({
+  product,
+  clothingCategories = clothingCategoryOptions,
+  brandOptions = []
+}: {
+  product: ProductDto;
+  clothingCategories?: readonly ClothingCategoryOption[];
+  brandOptions?: string[];
+}) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const attributes = product.avitoAttributes ?? {};
@@ -66,7 +76,8 @@ export function ProductEditor({ product }: { product: ProductDto }) {
   const condition = String(attributes.condition ?? defaultClothingCondition);
   const clothingCategory = String(attributes.clothingCategory ?? defaultClothingCategory);
   const selectedClothingCategory =
-    clothingCategoryOptions.find((option) => option.key === clothingCategory) ??
+    clothingCategories.find((option) => option.key === clothingCategory) ??
+    clothingCategories[0] ??
     clothingCategoryOptions[0];
   const clothingItem = String(
     attributes.productSubtype ?? attributes.clothingItem ?? selectedClothingCategory.productSubtype ?? defaultClothingItem
@@ -96,7 +107,7 @@ export function ProductEditor({ product }: { product: ProductDto }) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const nextClothingCategory =
-      clothingCategoryOptions.find((option) => option.key === formData.get("clothingCategory")) ??
+      clothingCategories.find((option) => option.key === formData.get("clothingCategory")) ??
       selectedClothingCategory;
     try {
       await jsonRequest(`/api/products/${product.id}`, "PATCH", {
@@ -203,7 +214,17 @@ export function ProductEditor({ product }: { product: ProductDto }) {
           </label>
           <label>
             Бренд
-            <input className="field" name="brand" defaultValue={product.brand ?? ""} />
+            <input
+              className="field"
+              name="brand"
+              list="avito-brand-options"
+              defaultValue={product.brand ?? ""}
+            />
+            <datalist id="avito-brand-options">
+              {brandOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
           </label>
           <label>
             Категория Avito
@@ -217,14 +238,16 @@ export function ProductEditor({ product }: { product: ProductDto }) {
               value={editingClothingCategory}
               onChange={(event) => {
                 const next =
+                  clothingCategories.find((option) => option.key === event.target.value) ??
                   clothingCategoryOptions.find((option) => option.key === event.target.value) ??
+                  clothingCategories[0] ??
                   clothingCategoryOptions[0];
                 setEditingClothingCategory(next.key);
                 setEditingClothingItem(next.productSubtype);
               }}
               required
             >
-              {clothingCategoryOptions.map((option) => (
+              {clothingCategories.map((option) => (
                 <option key={option.key} value={option.key}>
                   {option.goodsType} / {option.label}
                 </option>
@@ -321,11 +344,17 @@ export function ProductEditor({ product }: { product: ProductDto }) {
         <form className="form-grid three" onSubmit={createVariant}>
           <label>
             Название
-            <input className="field" name="title" placeholder={`${product.title} Черный 48 (M)`} required />
+            <input className="field" name="title" placeholder={`${product.title} Чёрный 48 (M)`} required />
           </label>
           <label>
             Цвет
-            <input className="field" name="color" placeholder="Черный" required />
+            <select className="select" name="color" defaultValue="Чёрный" required>
+              {clothingColorOptions.map((color) => (
+                <option key={color} value={color}>
+                  {color}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Размер
@@ -412,7 +441,16 @@ function VariantEditor({
         </label>
         <label>
           Цвет
-          <input className="field" name="color" defaultValue={variant.color} required />
+          <select className="select" name="color" defaultValue={variant.color} required>
+            {!clothingColorOptions.includes(variant.color as (typeof clothingColorOptions)[number]) ? (
+              <option value={variant.color}>{variant.color}</option>
+            ) : null}
+            {clothingColorOptions.map((color) => (
+              <option key={color} value={color}>
+                {color}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Размер

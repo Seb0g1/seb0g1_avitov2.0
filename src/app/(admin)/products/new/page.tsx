@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { ProductCreationWizard } from "@/components/admin/ProductCreationWizard";
+import { listAvitoFashionBrands } from "@/server/modules/avitoCategories/brandList";
+import { listClothingCategoryOptions } from "@/server/modules/avitoCategories/clothingTemplates";
 import { listAvitoCategories } from "@/server/modules/products/service";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewProductPage() {
   const categories = await listAvitoCategories();
+  const clothingCategories = await listClothingCategoryOptions();
+  const brandOptions = await listAvitoFashionBrands();
 
   return (
     <div className="grid">
@@ -20,7 +24,11 @@ export default async function NewProductPage() {
           В каталог
         </Link>
       </div>
-      <ProductCreationWizard initialCategories={categories} />
+      <ProductCreationWizard
+        initialCategories={categories}
+        clothingCategories={clothingCategories}
+        brandOptions={brandOptions}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { Prisma, VariantStatus } from "@prisma/client";
+import { clothingColorOptions, normalizeAvitoColor } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import { avitoRequest } from "./client";
@@ -81,22 +82,10 @@ const translitColors: Record<string, string> = {
 };
 
 const russianColors = new Set([
-  "Белый",
+  ...clothingColorOptions,
   "Черный",
-  "Чёрный",
-  "Серый",
   "Зеленый",
-  "Зелёный",
-  "Красный",
-  "Синий",
-  "Бежевый",
-  "Коричневый",
-  "Розовый",
-  "Фиолетовый",
-  "Оранжевый",
-  "Голубой",
-  "Желтый",
-  "Жёлтый"
+  "Желтый"
 ]);
 
 const knownBrands = [
@@ -260,7 +249,7 @@ function buildAutoloadGroupKey(autoloadId: string) {
 function inferColorFromTitle(title: string) {
   const match = title.match(/\(([^)]+)\)/);
   const value = match?.[1]?.trim();
-  return value && russianColors.has(value) ? value.replace("Чёр", "Чер").replace("Зелё", "Зеле").replace("Жёл", "Жел") : null;
+  return value && russianColors.has(value) ? normalizeAvitoColor(value) : null;
 }
 
 function inferBrandFromTitle(title: string) {
@@ -440,10 +429,12 @@ function normalizeItem(source: AvitoRecord): NormalizedAvitoItem | null {
   const autoloadAttributes = parseAutoloadAttributes(source);
   const brand = attribute(source, ["brand", "бренд"]) ?? inferBrandFromTitle(title);
   const color =
-    attribute(source, ["color", "цвет"]) ??
-    inferColorFromTitle(title) ??
-    autoloadAttributes.color ??
-    UNKNOWN_VALUE;
+    normalizeAvitoColor(
+      attribute(source, ["color", "цвет"]) ??
+        inferColorFromTitle(title) ??
+        autoloadAttributes.color ??
+        UNKNOWN_VALUE
+    ) || UNKNOWN_VALUE;
   const size = attribute(source, ["size", "размер"]) ?? autoloadAttributes.size ?? UNKNOWN_VALUE;
   const price = firstNumber(source.price, source.price_value, nestedItem.price);
   const status = normalizeStatus(source.status ?? source.state ?? nestedItem.status ?? nestedItem.state);

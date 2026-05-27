@@ -6,6 +6,7 @@ import {
   defaultClothingCondition,
   defaultClothingItem,
   getClothingCategoryOption,
+  normalizeAvitoColor,
   normalizeClothingMaterials
 } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
@@ -54,6 +55,7 @@ function productAttributes(input: {
     ...(asRecord(existing.manufacturerColors) as Record<string, string>),
     ...(input.manufacturerColors ?? {})
   };
+  const clothingCategory = String(existing.clothingCategory ?? categoryOption.key);
   const productSubtype = input.clothingItem?.trim() || String(existing.productSubtype ?? existing.clothingItem ?? categoryOption.productSubtype);
   return {
     ...existing,
@@ -61,7 +63,7 @@ function productAttributes(input: {
     material: materials.join(", "),
     adType: input.adType?.trim() || String(existing.adType ?? defaultAdType),
     condition: input.condition?.trim() || String(existing.condition ?? defaultClothingCondition),
-    clothingCategory: categoryOption.key,
+    clothingCategory,
     goodsType: String(existing.goodsType ?? categoryOption.goodsType),
     apparel: String(existing.apparel ?? categoryOption.apparel),
     productSubtype,
@@ -142,6 +144,14 @@ export async function createProduct(input: unknown) {
 
 export async function createProductWithVariants(input: unknown) {
   const data = createProductWithVariantsSchema.parse(input);
+  const colorGroups = (data.colorGroups ?? []).map((group) => {
+    const color = normalizeAvitoColor(group.color);
+    return {
+      ...group,
+      color,
+      manufacturerColor: group.manufacturerColor?.trim() || color
+    };
+  });
   const supplierData = supplierToPrismaData({
     supplierUrl: data.supplierUrl,
     supplierName: data.supplierName
@@ -155,7 +165,7 @@ export async function createProductWithVariants(input: unknown) {
     clothingItem: data.clothingItem,
     multiItemName: data.multiItemName,
     manufacturerColors: Object.fromEntries(
-      (data.colorGroups ?? []).map((group) => [
+      colorGroups.map((group) => [
         group.color,
         group.manufacturerColor?.trim() || group.color
       ])
@@ -163,7 +173,6 @@ export async function createProductWithVariants(input: unknown) {
     avitoAttributes: data.avitoAttributes
   });
   const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
-  const colorGroups = data.colorGroups ?? [];
   const colors = uniqueValues(colorGroups.map((group) => group.color));
   const sizes = uniqueValues(colorGroups.flatMap((group) => group.sizes));
   const variants =

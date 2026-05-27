@@ -18,6 +18,7 @@ import {
 import {
   clothingMaterialOptions,
   clothingCategoryOptions,
+  clothingColorOptions,
   clothingSizeOptions,
   defaultAdType,
   defaultClothingCategory,
@@ -25,7 +26,8 @@ import {
   defaultClothingItem,
   defaultClothingMaterials,
   formatClothingMaterials,
-  maxClothingMaterials
+  maxClothingMaterials,
+  type ClothingCategoryOption
 } from "@/lib/avitoOptions";
 import type { ProductDto } from "@/types/catalog";
 
@@ -43,9 +45,9 @@ type ColorGroupDraft = {
   photos: LocalPhoto[];
 };
 
-const defaultColors = ["Белый", "Черный", "Серый", "Бежевый"];
+const defaultColors = ["Белый", "Чёрный", "Серый", "Бежевый"];
 const conditionOptions = ["Новое с биркой", "Отличное", "Хорошее", "Удовлетворительное"];
-const adTypeOptions = ["Товар приобретен на продажу", "Личная вещь"];
+const adTypeOptions = ["Товар приобретен на продажу", "Товар от производителя"];
 
 function emptyColorGroup(color = ""): ColorGroupDraft {
   return {
@@ -126,7 +128,15 @@ function previewDescription(input: {
 Размер: ${input.size || "Не указан"}`;
 }
 
-export function ProductCreationWizard({ initialCategories }: { initialCategories: string[] }) {
+export function ProductCreationWizard({
+  initialCategories,
+  clothingCategories = clothingCategoryOptions,
+  brandOptions = []
+}: {
+  initialCategories: string[];
+  clothingCategories?: readonly ClothingCategoryOption[];
+  brandOptions?: string[];
+}) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [brand, setBrand] = useState("");
@@ -152,7 +162,8 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
   const firstPhoto = activeGroup?.photos[0]?.previewUrl;
   const effectiveMultiItemName = multiItemName.trim() || title.trim() || "Название мультиобъявления";
   const selectedClothingCategory =
-    clothingCategoryOptions.find((option) => option.key === clothingCategory) ??
+    clothingCategories.find((option) => option.key === clothingCategory) ??
+    clothingCategories[0] ??
     clothingCategoryOptions[0];
 
   const preview = useMemo(
@@ -193,8 +204,8 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
     const next = {
       ...source,
       id: crypto.randomUUID(),
-      color: `${source.color} копия`,
-      manufacturerColor: `${source.manufacturerColor || source.color} копия`,
+      color: defaultColors.find((value) => !allColors.includes(value)) || source.color,
+      manufacturerColor: defaultColors.find((value) => !allColors.includes(value)) || source.color,
       photos: source.photos.map((photo) => ({
         ...photo,
         id: crypto.randomUUID()
@@ -395,10 +406,16 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                 Бренд
                 <input
                   className="field"
+                  list="avito-brand-options"
                   value={brand}
                   onChange={(event) => setBrand(event.target.value)}
                   placeholder="Acne Studios"
                 />
+                <datalist id="avito-brand-options">
+                  {brandOptions.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
               </label>
               <label className="span-full">
                 Категория Avito
@@ -422,14 +439,16 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                   value={clothingCategory}
                   onChange={(event) => {
                     const next =
+                      clothingCategories.find((option) => option.key === event.target.value) ??
                       clothingCategoryOptions.find((option) => option.key === event.target.value) ??
+                      clothingCategories[0] ??
                       clothingCategoryOptions[0];
                     setClothingCategory(next.key);
                     setClothingItem(next.productSubtype);
                   }}
                   required
                 >
-                  {clothingCategoryOptions.map((option) => (
+                  {clothingCategories.map((option) => (
                     <option key={option.key} value={option.key}>
                       {option.goodsType} / {option.label}
                     </option>
@@ -506,8 +525,8 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                     <div className="variant-row-index">{index + 1}</div>
                     <label>
                       Цвет
-                      <input
-                        className="field"
+                      <select
+                        className="select"
                         value={group.color}
                         onChange={(event) =>
                           updateColorGroup(group.id, {
@@ -516,9 +535,17 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                               group.manufacturerColor === group.color ? event.target.value : group.manufacturerColor
                           })
                         }
-                        placeholder="Черный"
                         required
-                      />
+                      >
+                        {!clothingColorOptions.includes(group.color as (typeof clothingColorOptions)[number]) && group.color ? (
+                          <option value={group.color}>{group.color}</option>
+                        ) : null}
+                        {clothingColorOptions.map((color) => (
+                          <option key={color} value={color}>
+                            {color}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label>
                       Цвет от производителя
@@ -526,7 +553,7 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                         className="field"
                         value={group.manufacturerColor}
                         onChange={(event) => updateColorGroup(group.id, { manufacturerColor: event.target.value })}
-                        placeholder="Черный"
+                        placeholder="Чёрный"
                       />
                     </label>
                     <div className="color-actions">
