@@ -6,7 +6,7 @@ tsconfig.tsbuildinfo
 .env
 .env.local
 .env.*.local
-uploads
-exports
+/uploads
+/exports
 *.log
 prisma/dev.db
