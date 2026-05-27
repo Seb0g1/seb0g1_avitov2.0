@@ -7,7 +7,7 @@ describe("createProductWithVariantsSchema", () => {
       title: "Nike Stussy",
       baseCategory: "Одежда, обувь, аксессуары",
       materials: ["Хлопок", "Эластан"],
-      adType: "Товар приобретён на продажу",
+      adType: "Товар приобретен на продажу",
       condition: "Новое с биркой",
       clothingItem: "Футболка",
       multiItemName: "Nike Stussy",

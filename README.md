@@ -62,3 +62,5 @@ For nginx deployment on `https://amsterdam2.sebog1.ru`, proxy traffic to `127.0.
 ## Avito Notes
 
 `AVITO_CLIENT_ID` and `AVITO_CLIENT_SECRET` are read only from environment variables. Endpoint paths are configurable because available Avito API methods and category field schemas depend on account access. XML/CSV autoload is the default MVP publication mode; direct Items API mode publishes each ready variant as a separate listing.
+
+For clothing autoload feeds, set the exact shop geo before giving the feed URL to Avito: `STORE_REGION`, `STORE_CITY`, and a real `STORE_ADDRESS` with street and house number. Optional `STORE_LATITUDE` and `STORE_LONGITUDE` are included in XML when present. Rows without photos, exact geo, valid price/stock, or supported sizes are skipped and listed at `/api/exports/diagnostics`.

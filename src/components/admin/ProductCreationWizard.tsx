@@ -43,7 +43,7 @@ type ColorGroupDraft = {
 
 const defaultColors = ["Белый", "Черный", "Серый", "Бежевый"];
 const conditionOptions = ["Новое с биркой", "Отличное", "Хорошее", "Удовлетворительное"];
-const adTypeOptions = ["Товар приобретён на продажу", "Личная вещь"];
+const adTypeOptions = ["Товар приобретен на продажу", "Личная вещь"];
 
 function emptyColorGroup(color = ""): ColorGroupDraft {
   return {

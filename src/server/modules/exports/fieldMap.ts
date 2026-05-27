@@ -2,8 +2,6 @@ import { env } from "@/server/config/env";
 
 export type FeedFieldMap = {
   category: string;
-  condition: string;
-  goodsType: string;
   material: string;
   adType: string;
   clothingItem: string;
@@ -17,13 +15,18 @@ export type FeedFieldMap = {
   quantity: string;
 };
 
+export type ClothingFeedDefaults = {
+  goodsType: string;
+  adType: string;
+  condition: string;
+  clothingItem: string;
+};
+
 export const clothingFeedFieldMap: FeedFieldMap = {
   category: env.DEFAULT_AVITO_CATEGORY,
-  condition: env.DEFAULT_CONDITION,
-  goodsType: "Мужская одежда",
   material: "Material",
   adType: "AdType",
-  clothingItem: "ClothingType",
+  clothingItem: "Apparel",
   multiItemName: "MultiItemName",
   manufacturerColor: "ManufacturerColor",
   multiItem: "MultiItem",
@@ -32,4 +35,11 @@ export const clothingFeedFieldMap: FeedFieldMap = {
   color: "Color",
   size: "Size",
   quantity: "Quantity"
+};
+
+export const clothingFeedDefaults: ClothingFeedDefaults = {
+  goodsType: env.AVITO_FEED_GOODS_TYPE,
+  adType: env.AVITO_FEED_AD_TYPE,
+  condition: env.AVITO_FEED_CONDITION,
+  clothingItem: env.AVITO_FEED_APPAREL
 };

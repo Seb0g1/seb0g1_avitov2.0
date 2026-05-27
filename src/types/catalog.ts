@@ -48,6 +48,32 @@ export type ProductDto = {
   variants: VariantDto[];
 };
 
+export type FeedSkipReason =
+  | "нет фото"
+  | "неподдерживаемый размер"
+  | "нет гео"
+  | "битая кодировка"
+  | "нет цены"
+  | "нулевой остаток"
+  | "дубль цвет+размер";
+
+export type FeedSkipDto = {
+  productId: string;
+  variantId: string;
+  title: string;
+  color: string;
+  size: string;
+  reasons: FeedSkipReason[];
+};
+
+export type FeedDiagnosticsDto = {
+  totalVariants: number;
+  readyRows: number;
+  skippedRows: number;
+  summary: Record<FeedSkipReason, number>;
+  skipped: FeedSkipDto[];
+};
+
 export type MetricsDto = {
   online: number;
   moderation: number;

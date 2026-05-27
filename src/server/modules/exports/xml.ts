@@ -27,7 +27,12 @@ export function buildAvitoXml(rows: FeedRow[]) {
     ad.ele(clothingFeedFieldMap.multiItemName).txt(row.multiItemName);
     ad.ele(clothingFeedFieldMap.article).txt(row.article);
     ad.ele("Region").txt(row.region);
+    ad.ele("City").txt(row.city);
     ad.ele("Address").txt(row.address);
+    if (row.latitude && row.longitude) {
+      ad.ele("Latitude").txt(row.latitude);
+      ad.ele("Longitude").txt(row.longitude);
+    }
     ad.ele("ContactPhone").txt(row.contactPhone);
     if (row.brand) {
       ad.ele("Brand").txt(row.brand);

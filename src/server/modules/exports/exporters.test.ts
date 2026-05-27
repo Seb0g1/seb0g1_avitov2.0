@@ -16,10 +16,10 @@ const rows: FeedRow[] = [
     brand: "Nike",
     category: "Одежда, обувь, аксессуары",
     goodsType: "Мужская одежда",
-    condition: "Новое",
+    condition: "Новое с биркой",
     material: "Хлопок",
     materials: ["Хлопок"],
-    adType: "Товар приобретён на продажу",
+    adType: "Товар приобретен на продажу",
     clothingItem: "Футболка",
     multiItemName: "Nike Stussy",
     manufacturerColor: "Black",
@@ -27,7 +27,7 @@ const rows: FeedRow[] = [
     multiItemGroup: "MI-NIKESTUSSY",
     article: "AV-NIKESTUSSY-BLACK-M",
     color: "Black",
-    size: "M",
+    size: "48 (M)",
     price: 12990,
     quantity: 3,
     status: VariantStatus.READY,
@@ -35,7 +35,10 @@ const rows: FeedRow[] = [
     avitoItemId: null,
     photos: ["https://example.com/black-m.jpg"],
     region: "Москва",
-    address: "Москва",
+    city: "Москва",
+    address: "Россия, Москва, Тверская улица, 1",
+    latitude: null,
+    longitude: null,
     contactPhone: "+7 999 000-00-00",
     supplierName: "МойСклад",
     supplierUrl: "https://b2b.moysklad.ru/public/token/catalog?categoryId=category&productId=product",
@@ -51,10 +54,10 @@ const rows: FeedRow[] = [
     brand: "Nike",
     category: "Одежда, обувь, аксессуары",
     goodsType: "Мужская одежда",
-    condition: "Новое",
+    condition: "Новое с биркой",
     material: "Хлопок",
     materials: ["Хлопок"],
-    adType: "Товар приобретён на продажу",
+    adType: "Товар приобретен на продажу",
     clothingItem: "Футболка",
     multiItemName: "Nike Stussy",
     manufacturerColor: "Grey",
@@ -62,7 +65,7 @@ const rows: FeedRow[] = [
     multiItemGroup: "MI-NIKESTUSSY",
     article: "AV-NIKESTUSSY-GREY-L",
     color: "Grey",
-    size: "L",
+    size: "50 (L)",
     price: 11990,
     quantity: 2,
     status: VariantStatus.READY,
@@ -70,7 +73,10 @@ const rows: FeedRow[] = [
     avitoItemId: null,
     photos: ["https://example.com/grey-l.jpg"],
     region: "Москва",
-    address: "Москва",
+    city: "Москва",
+    address: "Россия, Москва, Тверская улица, 1",
+    latitude: null,
+    longitude: null,
     contactPhone: "+7 999 000-00-00",
     supplierName: "МойСклад",
     supplierUrl: "https://b2b.moysklad.ru/public/token/catalog?categoryId=category&productId=product",
@@ -86,9 +92,16 @@ describe("Avito exporters", () => {
     expect(xml).toContain("<Id>product-variant-black-m</Id>");
     expect(xml).toContain("<Color>Grey</Color>");
     expect(xml).toContain("<ManufacturerColor>Grey</ManufacturerColor>");
+    expect(xml).toContain("<Apparel>Футболка</Apparel>");
+    expect(xml).not.toContain("<ClothingType>");
+    expect(xml).toContain("<Condition>Новое с биркой</Condition>");
+    expect(xml).toContain("<City>Москва</City>");
+    expect(xml).toContain("<Size>50 (L)</Size>");
     expect(xml).toContain("<MultiItem>Да</MultiItem>");
     expect(xml).toContain("<MultiItemGroup>MI-NIKESTUSSY</MultiItemGroup>");
     expect(xml).toContain("<MultiItemName>Nike Stussy</MultiItemName>");
+    expect(xml).not.toContain("����");
+    expect(xml).not.toContain("Рњ");
   });
 
   it("creates one CSV row per variant plus header", () => {
@@ -98,7 +111,8 @@ describe("Avito exporters", () => {
     expect(lines[0]).toContain('"Id";"Category"');
     expect(lines[1]).toContain('"Nike Stussy Black M"');
     expect(lines[1]).toContain('"Да";"MI-NIKESTUSSY"');
-    expect(lines[1]).toContain('"Товар приобретён на продажу";"Футболка"');
+    expect(lines[0]).toContain('"Apparel"');
+    expect(lines[1]).toContain('"Товар приобретен на продажу";"Футболка"');
   });
 
   it("adds supplier columns to Excel export", async () => {

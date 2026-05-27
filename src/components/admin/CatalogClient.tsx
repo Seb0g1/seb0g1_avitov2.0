@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PublicationMode, VariantStatus } from "@prisma/client";
 import {
+  AlertTriangle,
   CheckSquare,
   Download,
   ExternalLink,
@@ -16,7 +17,7 @@ import {
   Search,
   Trash2
 } from "lucide-react";
-import type { ProductDto } from "@/types/catalog";
+import type { FeedDiagnosticsDto, ProductDto } from "@/types/catalog";
 import {
   buildCatalogProductRows,
   variantIdsForSelectedProducts,
@@ -59,7 +60,13 @@ function compactList(values: string[]) {
   return values.join(", ");
 }
 
-export function CatalogClient({ products }: { products: ProductDto[] }) {
+export function CatalogClient({
+  products,
+  feedDiagnostics
+}: {
+  products: ProductDto[];
+  feedDiagnostics: FeedDiagnosticsDto;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -71,6 +78,15 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
     () => variantIdsForSelectedProducts(products, selected),
     [products, selected]
   );
+  const skippedByProduct = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const item of feedDiagnostics.skipped) {
+      const existing = map.get(item.productId) ?? [];
+      existing.push(`${item.title}: ${item.reasons.join(", ")}`);
+      map.set(item.productId, existing);
+    }
+    return map;
+  }, [feedDiagnostics.skipped]);
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -273,6 +289,19 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
         </button>
       </div>
 
+      {feedDiagnostics.skippedRows > 0 ? (
+        <div className="feed-warning-banner">
+          <AlertTriangle size={18} aria-hidden />
+          <span>
+            В XML готово {feedDiagnostics.readyRows} строк, пропущено {feedDiagnostics.skippedRows}.
+            Проверьте фото, размеры и точный адрес магазина.
+          </span>
+          <a href="/api/exports/diagnostics" target="_blank" rel="noreferrer">
+            Диагностика
+          </a>
+        </div>
+      ) : null}
+
       <div className="table-wrap">
         <table>
           <thead>
@@ -304,6 +333,16 @@ export function CatalogClient({ products }: { products: ProductDto[] }) {
                   </Link>
                   <div className="muted">{row.product.brand ?? "Без бренда"}</div>
                   {row.description ? <div className="description-clamp">{row.description}</div> : null}
+                  {skippedByProduct.get(row.product.id)?.length ? (
+                    <div className="feed-row-warning">
+                      <AlertTriangle size={15} aria-hidden />
+                      <span>
+                        Не попадёт в XML:{" "}
+                        {skippedByProduct.get(row.product.id)?.slice(0, 2).join("; ")}
+                        {(skippedByProduct.get(row.product.id)?.length ?? 0) > 2 ? "..." : ""}
+                      </span>
+                    </div>
+                  ) : null}
                 </td>
                 <td>
                   <strong>{row.variants.length} вариантов</strong>

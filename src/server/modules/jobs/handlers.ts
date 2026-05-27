@@ -1,5 +1,4 @@
 import { JobStatus, JobType, Prisma, PublicationMode, VariantStatus } from "@prisma/client";
-import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import { createAvitoItem } from "@/server/modules/avitoApi/items";
 import { generateAvitoCsvExport, generateAvitoXmlExport } from "@/server/modules/exports/service";
@@ -60,7 +59,8 @@ export async function processPublicationJob(payload: PublicationPayload) {
             clothingItem: row.clothingItem,
             condition: row.condition,
             goodsType: row.goodsType,
-            region: env.STORE_REGION
+            region: row.region,
+            city: row.city
           }
         });
 

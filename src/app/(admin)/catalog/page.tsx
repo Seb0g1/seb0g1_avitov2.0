@@ -1,4 +1,5 @@
 import { CatalogClient } from "@/components/admin/CatalogClient";
+import { getFeedRowsWithDiagnostics } from "@/server/modules/exports/feedRows";
 import { listProducts } from "@/server/modules/products/service";
 import { serializeProduct } from "@/server/modules/products/serialize";
 
@@ -15,6 +16,14 @@ type SearchParams = Promise<{
 export default async function CatalogPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const products = (await listProducts(params)).map(serializeProduct);
+  const diagnostics = await getFeedRowsWithDiagnostics();
+  const feedDiagnostics = {
+    totalVariants: diagnostics.totalVariants,
+    readyRows: diagnostics.readyRows,
+    skippedRows: diagnostics.skippedRows,
+    summary: diagnostics.summary,
+    skipped: diagnostics.skipped
+  };
 
   return (
     <div className="grid">
@@ -24,7 +33,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Sear
           <h1>Товары и варианты</h1>
         </div>
       </header>
-      <CatalogClient products={products} />
+      <CatalogClient products={products} feedDiagnostics={feedDiagnostics} />
     </div>
   );
 }

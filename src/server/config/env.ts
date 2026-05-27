@@ -18,6 +18,10 @@ const envSchema = z.object({
   AVITO_ITEM_UNPUBLISH_METHOD: z
     .enum(["POST", "DELETE", "PATCH", "PUT"])
     .default("POST"),
+  AVITO_FEED_AD_TYPE: z.string().default("Товар приобретен на продажу"),
+  AVITO_FEED_CONDITION: z.string().default("Новое с биркой"),
+  AVITO_FEED_APPAREL: z.string().default("Футболка"),
+  AVITO_FEED_GOODS_TYPE: z.string().default("Мужская одежда"),
   AVITO_IMPORT_FETCH_DETAILS: z
     .string()
     .default("false")
@@ -29,10 +33,13 @@ const envSchema = z.object({
   EXPORT_DIR: z.string().default("./exports"),
   FEED_PUBLIC_TOKEN: z.string().default("dev-feed-token"),
   STORE_REGION: z.string().default("Москва"),
-  STORE_ADDRESS: z.string().default("Москва, ул. Примерная, 1"),
+  STORE_CITY: z.string().default("Москва"),
+  STORE_ADDRESS: z.string().default("Россия, Москва, <улица>, <дом>"),
+  STORE_LATITUDE: z.string().optional(),
+  STORE_LONGITUDE: z.string().optional(),
   STORE_PHONE: z.string().default("+7 999 000-00-00"),
   DEFAULT_AVITO_CATEGORY: z.string().default("Одежда, обувь, аксессуары"),
-  DEFAULT_CONDITION: z.string().default("Новое")
+  DEFAULT_CONDITION: z.string().default("Новое с биркой")
 });
 
 export const env = envSchema.parse(process.env);

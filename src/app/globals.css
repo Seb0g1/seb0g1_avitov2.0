@@ -259,6 +259,35 @@ h3 {
   gap: 6px;
 }
 
+.feed-warning-banner,
+.feed-row-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #92400e;
+}
+
+.feed-warning-banner {
+  justify-content: space-between;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  padding: 10px 12px;
+}
+
+.feed-warning-banner a {
+  flex: 0 0 auto;
+  color: #9a3412;
+  font-weight: 700;
+}
+
+.feed-row-warning {
+  margin-top: 8px;
+  max-width: 560px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .row-actions {
   min-width: 230px;
 }

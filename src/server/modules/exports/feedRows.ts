@@ -5,15 +5,13 @@ import {
   buildVariantArticle,
   buildVariantDescription,
   clothingSizeOptions,
-  defaultAdType,
-  defaultClothingCondition,
-  defaultClothingItem,
   formatClothingMaterials,
   normalizeClothingMaterials,
   uniqueValues
 } from "@/server/modules/products/clothing";
 import { resolveEffectiveSupplier } from "@/server/modules/suppliers/moysklad";
-import { clothingFeedFieldMap } from "./fieldMap";
+import type { FeedDiagnosticsDto, FeedSkipDto, FeedSkipReason } from "@/types/catalog";
+import { clothingFeedDefaults, clothingFeedFieldMap } from "./fieldMap";
 
 export type FeedRow = {
   externalId: string;
@@ -43,7 +41,10 @@ export type FeedRow = {
   avitoItemId?: string | null;
   photos: string[];
   region: string;
+  city: string;
   address: string;
+  latitude: string | null;
+  longitude: string | null;
   contactPhone: string;
   supplierName: string | null;
   supplierUrl: string | null;
@@ -59,11 +60,48 @@ const defaultFeedStatuses: VariantStatus[] = [
 ];
 
 const damagedTextMarker = "\uFFFD";
+const mojibakeFragments = [
+  "Рњ",
+  "Рќ",
+  "Р”",
+  "РҐ",
+  "Рћ",
+  "Рџ",
+  "Рў",
+  "Р¤",
+  "Р°",
+  "Рµ",
+  "Рё",
+  "Рѕ",
+  "Р»",
+  "Рј",
+  "РЅ",
+  "Рє",
+  "Рґ",
+  "СЃ",
+  "СЂ",
+  "С‹",
+  "СЊ",
+  "С‚",
+  "С‡",
+  "С€"
+];
+
 const safeFallbacks = {
   region: "Москва",
-  address: "Москва",
-  goodsType: "Мужская одежда"
+  city: "Москва",
+  address: ""
 };
+
+const feedSkipReasons: FeedSkipReason[] = [
+  "нет фото",
+  "неподдерживаемый размер",
+  "нет гео",
+  "битая кодировка",
+  "нет цены",
+  "нулевой остаток",
+  "дубль цвет+размер"
+];
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -71,16 +109,24 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function hasDamagedText(value: unknown) {
+  const text = String(value ?? "");
+  return (
+    text.includes(damagedTextMarker) ||
+    mojibakeFragments.some((fragment) => text.includes(fragment))
+  );
+}
+
 function safeText(value: unknown, fallback: string, placeholders: string[] = []) {
   const text = String(value ?? "").trim();
-  if (!text || text.includes(damagedTextMarker) || placeholders.includes(text)) {
+  if (!text || hasDamagedText(text) || placeholders.includes(text)) {
     return fallback;
   }
 
   return text;
 }
 
-function normalizeFeedSize(size: string): string | null {
+export function normalizeFeedSize(size: string): string | null {
   const text = size.trim();
   const exact = clothingSizeOptions.find((option) => option.value === text);
   if (exact) {
@@ -101,10 +147,94 @@ function uniqueFeedSizes(sizes: string[]) {
   return uniqueValues(sizes.map(normalizeFeedSize).filter(isString));
 }
 
-export async function getFeedRows(options?: {
+function validCoordinate(value: string | undefined, min: number, max: number) {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const number = Number(value);
+  return Number.isFinite(number) && number >= min && number <= max ? value.trim() : null;
+}
+
+function getFeedGeo() {
+  const latitude = validCoordinate(env.STORE_LATITUDE, -90, 90);
+  const longitude = validCoordinate(env.STORE_LONGITUDE, -180, 180);
+  const hasCoordinates = Boolean(latitude && longitude);
+  const region = safeText(env.STORE_REGION, safeFallbacks.region);
+  const city = safeText(env.STORE_CITY, safeFallbacks.city);
+  const address = safeText(env.STORE_ADDRESS, safeFallbacks.address);
+  const addressLooksExact =
+    Boolean(address) &&
+    address.includes(",") &&
+    /\d/.test(address) &&
+    !address.includes("<") &&
+    !/пример/i.test(address);
+
+  return {
+    ok: Boolean(region && city && (addressLooksExact || hasCoordinates)),
+    region,
+    city,
+    address,
+    latitude,
+    longitude
+  };
+}
+
+function emptySummary(): Record<FeedSkipReason, number> {
+  return Object.fromEntries(feedSkipReasons.map((reason) => [reason, 0])) as Record<
+    FeedSkipReason,
+    number
+  >;
+}
+
+function summarizeSkipped(skipped: FeedSkipDto[]) {
+  const summary = emptySummary();
+  for (const item of skipped) {
+    for (const reason of item.reasons) {
+      summary[reason] += 1;
+    }
+  }
+  return summary;
+}
+
+export function getFeedValidationReasons(input: {
+  size: string;
+  photos: string[];
+  price: number;
+  quantity: number;
+  geoReady: boolean;
+  damagedValues?: unknown[];
+  duplicate?: boolean;
+}) {
+  const reasons: FeedSkipReason[] = [];
+  if (!normalizeFeedSize(input.size)) {
+    reasons.push("неподдерживаемый размер");
+  }
+  if (input.photos.length === 0) {
+    reasons.push("нет фото");
+  }
+  if (!input.geoReady) {
+    reasons.push("нет гео");
+  }
+  if (!Number.isFinite(input.price) || input.price <= 0) {
+    reasons.push("нет цены");
+  }
+  if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
+    reasons.push("нулевой остаток");
+  }
+  if (input.duplicate) {
+    reasons.push("дубль цвет+размер");
+  }
+  if ((input.damagedValues ?? []).some(hasDamagedText)) {
+    reasons.push("битая кодировка");
+  }
+  return reasons;
+}
+
+export async function getFeedRowsWithDiagnostics(options?: {
   variantIds?: string[];
   statuses?: VariantStatus[];
-}) {
+}): Promise<FeedDiagnosticsDto & { rows: FeedRow[] }> {
   const variants = await prisma.variant.findMany({
     where: {
       ...(options?.variantIds?.length ? { id: { in: options.variantIds } } : {}),
@@ -128,20 +258,50 @@ export async function getFeedRows(options?: {
   });
 
   const seenVariantKeys = new Set<string>();
-
-  return variants.flatMap<FeedRow>((variant) => {
+  const skipped: FeedSkipDto[] = [];
+  const geo = getFeedGeo();
+  const rows = variants.flatMap<FeedRow>((variant) => {
     const attributes = asRecord(variant.product.avitoAttributes);
     const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
     const material = formatClothingMaterials(materials);
     const manufacturerColors = asRecord(attributes.manufacturerColors);
     const size = normalizeFeedSize(variant.size);
-    if (!size) {
-      return [];
-    }
-
     const multiItemGroup = String(attributes.multiItemGroup ?? variant.productId);
-    const variantKey = `${multiItemGroup}:${variant.color.trim().toLowerCase()}:${size}`;
-    if (seenVariantKeys.has(variantKey)) {
+    const variantKey = size
+      ? `${multiItemGroup}:${variant.color.trim().toLowerCase()}:${size}`
+      : "";
+    const photos = variant.photos
+      .map((photo) => photo.publicUrl)
+      .filter((photo) => photo && !hasDamagedText(photo));
+    const price = Number(variant.price);
+    const reasons = getFeedValidationReasons({
+      size: variant.size,
+      photos,
+      price,
+      quantity: variant.quantity,
+      geoReady: geo.ok,
+      duplicate: Boolean(variantKey && seenVariantKeys.has(variantKey)),
+      damagedValues: [
+        variant.title,
+        variant.color,
+        variant.product.title,
+        variant.product.baseCategory,
+        variant.product.brand,
+        env.STORE_REGION,
+        env.STORE_CITY,
+        env.STORE_ADDRESS
+      ]
+    });
+
+    if (reasons.length > 0 || !size) {
+      skipped.push({
+        productId: variant.productId,
+        variantId: variant.id,
+        title: variant.title,
+        color: variant.color,
+        size: variant.size,
+        reasons
+      });
       return [];
     }
     seenVariantKeys.add(variantKey);
@@ -162,6 +322,19 @@ export async function getFeedRows(options?: {
     );
     const sizes = uniqueFeedSizes(availableVariants.map((productVariant) => productVariant.size));
     const supplier = resolveEffectiveSupplier(variant.product, variant);
+    const category = safeText(variant.product.baseCategory, clothingFeedFieldMap.category);
+    const goodsType = safeText(attributes.goodsType, clothingFeedDefaults.goodsType, ["GoodsType"]);
+    const condition = safeText(
+      attributes.condition ?? env.DEFAULT_CONDITION,
+      clothingFeedDefaults.condition,
+      ["Condition"]
+    );
+    const adType = safeText(attributes.adType, clothingFeedDefaults.adType, ["AdType"]);
+    const clothingItem = safeText(attributes.clothingItem, clothingFeedDefaults.clothingItem, [
+      "ClothingType",
+      "Apparel"
+    ]);
+
     return [{
       externalId: `${variant.productId}-${variant.id}`,
       productId: variant.productId,
@@ -174,19 +347,17 @@ export async function getFeedRows(options?: {
           title: variant.product.title,
           materials,
           color: variant.color,
-          size: variant.size,
+          size,
           article,
           colors,
           sizes
         }),
       brand: variant.product.brand,
-      category: variant.product.baseCategory || clothingFeedFieldMap.category,
-      goodsType: safeText(attributes.goodsType, safeFallbacks.goodsType, ["GoodsType"]),
-      condition: safeText(attributes.condition ?? env.DEFAULT_CONDITION, defaultClothingCondition, [
-        "Condition"
-      ]),
-      adType: safeText(attributes.adType, defaultAdType, ["AdType"]),
-      clothingItem: safeText(attributes.clothingItem, defaultClothingItem, ["ClothingType"]),
+      category,
+      goodsType,
+      condition,
+      adType,
+      clothingItem,
       multiItemName: String(attributes.multiItemName ?? variant.product.title),
       manufacturerColor: String(manufacturerColors[variant.color] ?? variant.color),
       material,
@@ -201,9 +372,12 @@ export async function getFeedRows(options?: {
       status: variant.status,
       updatedAt: variant.updatedAt,
       avitoItemId: variant.avitoItemId,
-      photos: variant.photos.map((photo) => photo.publicUrl),
-      region: safeText(env.STORE_REGION, safeFallbacks.region),
-      address: safeText(env.STORE_ADDRESS, safeFallbacks.address),
+      photos,
+      region: geo.region,
+      city: geo.city,
+      address: geo.address,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
       contactPhone: env.STORE_PHONE,
       supplierName: supplier?.name ?? null,
       supplierUrl: supplier?.url ?? null,
@@ -211,4 +385,21 @@ export async function getFeedRows(options?: {
       supplierCategoryId: supplier?.categoryId ?? null
     }];
   });
+
+  return {
+    rows,
+    totalVariants: variants.length,
+    readyRows: rows.length,
+    skippedRows: skipped.length,
+    summary: summarizeSkipped(skipped),
+    skipped
+  };
+}
+
+export async function getFeedRows(options?: {
+  variantIds?: string[];
+  statuses?: VariantStatus[];
+}) {
+  const diagnostics = await getFeedRowsWithDiagnostics(options);
+  return diagnostics.rows;
 }

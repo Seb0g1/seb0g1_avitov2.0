@@ -26,7 +26,7 @@ export const clothingMaterialOptions = [
 
 export const defaultClothingMaterials = ["Хлопок"];
 export const maxClothingMaterials = 5;
-export const defaultAdType = "Товар приобретён на продажу";
+export const defaultAdType = "Товар приобретен на продажу";
 export const defaultClothingCondition = "Новое с биркой";
 export const defaultClothingItem = "Футболка";
 
