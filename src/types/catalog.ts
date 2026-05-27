@@ -63,15 +63,19 @@ export type FeedSkipDto = {
   title: string;
   color: string;
   size: string;
+  status: VariantStatus;
   reasons: FeedSkipReason[];
 };
 
 export type FeedDiagnosticsDto = {
   totalVariants: number;
   readyRows: number;
-  skippedRows: number;
+  exportSkippedRows: number;
+  actionableSkippedRows: number;
   summary: Record<FeedSkipReason, number>;
+  actionableSummary: Record<FeedSkipReason, number>;
   skipped: FeedSkipDto[];
+  actionableSkipped: FeedSkipDto[];
 };
 
 export type MetricsDto = {

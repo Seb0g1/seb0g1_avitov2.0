@@ -80,13 +80,13 @@ export function CatalogClient({
   );
   const skippedByProduct = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const item of feedDiagnostics.skipped) {
+    for (const item of feedDiagnostics.actionableSkipped) {
       const existing = map.get(item.productId) ?? [];
       existing.push(`${item.title}: ${item.reasons.join(", ")}`);
       map.set(item.productId, existing);
     }
     return map;
-  }, [feedDiagnostics.skipped]);
+  }, [feedDiagnostics.actionableSkipped]);
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -289,12 +289,12 @@ export function CatalogClient({
         </button>
       </div>
 
-      {feedDiagnostics.skippedRows > 0 ? (
+      {feedDiagnostics.actionableSkippedRows > 0 ? (
         <div className="feed-warning-banner">
           <AlertTriangle size={18} aria-hidden />
           <span>
-            В XML готово {feedDiagnostics.readyRows} строк, пропущено {feedDiagnostics.skippedRows}.
-            Проверьте фото, размеры и точный адрес магазина.
+            К исправлению {feedDiagnostics.actionableSkippedRows} черновиков/готовых вариантов.
+            В XML сейчас готово {feedDiagnostics.readyRows} строк.
           </span>
           <a href="/api/exports/diagnostics" target="_blank" rel="noreferrer">
             Диагностика

@@ -60,32 +60,6 @@ const defaultFeedStatuses: VariantStatus[] = [
 ];
 
 const damagedTextMarker = "\uFFFD";
-const mojibakeFragments = [
-  "Рњ",
-  "Рќ",
-  "Р”",
-  "РҐ",
-  "Рћ",
-  "Рџ",
-  "Рў",
-  "Р¤",
-  "Р°",
-  "Рµ",
-  "Рё",
-  "Рѕ",
-  "Р»",
-  "Рј",
-  "РЅ",
-  "Рє",
-  "Рґ",
-  "СЃ",
-  "СЂ",
-  "С‹",
-  "СЊ",
-  "С‚",
-  "С‡",
-  "С€"
-];
 
 const safeFallbacks = {
   region: "Москва",
@@ -103,6 +77,11 @@ const feedSkipReasons: FeedSkipReason[] = [
   "дубль цвет+размер"
 ];
 
+const actionableFeedStatuses = new Set<VariantStatus>([
+  VariantStatus.DRAFT,
+  VariantStatus.READY
+]);
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -111,10 +90,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function hasDamagedText(value: unknown) {
   const text = String(value ?? "");
-  return (
-    text.includes(damagedTextMarker) ||
-    mojibakeFragments.some((fragment) => text.includes(fragment))
-  );
+  return text.includes(damagedTextMarker);
 }
 
 function safeText(value: unknown, fallback: string, placeholders: string[] = []) {
@@ -195,6 +171,10 @@ function summarizeSkipped(skipped: FeedSkipDto[]) {
     }
   }
   return summary;
+}
+
+export function isActionableFeedStatus(status: VariantStatus) {
+  return actionableFeedStatuses.has(status);
 }
 
 export function getFeedValidationReasons(input: {
@@ -300,6 +280,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
         title: variant.title,
         color: variant.color,
         size: variant.size,
+        status: variant.status,
         reasons
       });
       return [];
@@ -386,13 +367,18 @@ export async function getFeedRowsWithDiagnostics(options?: {
     }];
   });
 
+  const actionableSkipped = skipped.filter((item) => isActionableFeedStatus(item.status));
+
   return {
     rows,
     totalVariants: variants.length,
     readyRows: rows.length,
-    skippedRows: skipped.length,
+    exportSkippedRows: skipped.length,
+    actionableSkippedRows: actionableSkipped.length,
     summary: summarizeSkipped(skipped),
-    skipped
+    actionableSummary: summarizeSkipped(actionableSkipped),
+    skipped,
+    actionableSkipped
   };
 }
 

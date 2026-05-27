@@ -20,9 +20,12 @@ export default async function CatalogPage({ searchParams }: { searchParams: Sear
   const feedDiagnostics = {
     totalVariants: diagnostics.totalVariants,
     readyRows: diagnostics.readyRows,
-    skippedRows: diagnostics.skippedRows,
+    exportSkippedRows: diagnostics.exportSkippedRows,
+    actionableSkippedRows: diagnostics.actionableSkippedRows,
     summary: diagnostics.summary,
-    skipped: diagnostics.skipped
+    actionableSummary: diagnostics.actionableSummary,
+    skipped: diagnostics.skipped,
+    actionableSkipped: diagnostics.actionableSkipped
   };
 
   return (

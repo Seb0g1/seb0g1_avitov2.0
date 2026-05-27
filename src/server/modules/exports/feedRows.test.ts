@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getFeedValidationReasons, normalizeFeedSize } from "./feedRows";
+import { VariantStatus } from "@prisma/client";
+import {
+  getFeedValidationReasons,
+  isActionableFeedStatus,
+  normalizeFeedSize
+} from "./feedRows";
 
 describe("feed row validation", () => {
   it("normalizes Avito clothing sizes", () => {
@@ -39,5 +44,39 @@ describe("feed row validation", () => {
         geoReady: false
       })
     ).toContain("нет гео");
+  });
+
+  it("does not treat normal Russian text as damaged encoding", () => {
+    expect(
+      getFeedValidationReasons({
+        size: "48 (M)",
+        photos: ["https://example.com/photo.jpg"],
+        price: 2199,
+        quantity: 1,
+        geoReady: true,
+        damagedValues: ["Футболка Nike x Stussy"]
+      })
+    ).not.toContain("битая кодировка");
+  });
+
+  it("treats replacement characters as damaged encoding", () => {
+    expect(
+      getFeedValidationReasons({
+        size: "48 (M)",
+        photos: ["https://example.com/photo.jpg"],
+        price: 2199,
+        quantity: 1,
+        geoReady: true,
+        damagedValues: ["Футболка � Nike"]
+      })
+    ).toContain("битая кодировка");
+  });
+
+  it("limits catalog actionable diagnostics to draft and ready variants", () => {
+    expect(isActionableFeedStatus(VariantStatus.DRAFT)).toBe(true);
+    expect(isActionableFeedStatus(VariantStatus.READY)).toBe(true);
+    expect(isActionableFeedStatus(VariantStatus.PUBLISHED)).toBe(false);
+    expect(isActionableFeedStatus(VariantStatus.UPLOADED)).toBe(false);
+    expect(isActionableFeedStatus(VariantStatus.MODERATION)).toBe(false);
   });
 });
