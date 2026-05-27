@@ -3,7 +3,7 @@ export const clothingSizeOptions = [
   { value: "48 (M)", label: "48 (M)", code: "M" },
   { value: "50 (L)", label: "50 (L)", code: "L" },
   { value: "54 (XL)", label: "54 (XL)", code: "XL" },
-  { value: "56 (2XL)", label: "56 (2XL)", code: "2XL" }
+  { value: "56 (XXL)", label: "56 (XXL)", code: "XXL" }
 ] as const;
 
 export const clothingSizeValues = clothingSizeOptions.map((size) => size.value);

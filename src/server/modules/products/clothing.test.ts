@@ -12,7 +12,7 @@ describe("clothing helpers", () => {
       "48 (M)",
       "50 (L)",
       "54 (XL)",
-      "56 (2XL)"
+      "56 (XXL)"
     ]);
   });
 

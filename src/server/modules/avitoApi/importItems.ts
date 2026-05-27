@@ -281,7 +281,7 @@ function normalizeProductTitle(title: string) {
   return title
     .replace(/\([^)]*\)/g, "")
     .replace(/\b(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL)\b/gi, "")
-    .replace(/\b(46|48|50|52|54|56)\s*\((S|M|L|XL|2XL)\)/gi, "")
+    .replace(/\b(46|48|50|52|54|56)\s*\((S|M|L|XL|XXL|2XL)\)/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 }

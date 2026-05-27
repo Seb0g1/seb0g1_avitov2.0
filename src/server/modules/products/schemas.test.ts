@@ -17,12 +17,12 @@ describe("createProductWithVariantsSchema", () => {
         {
           color: "Белый",
           manufacturerColor: "Белый",
-          sizes: ["46 (S)", "48 (M)", "50 (L)", "54 (XL)", "56 (2XL)"]
+          sizes: ["46 (S)", "48 (M)", "50 (L)", "54 (XL)", "56 (XXL)"]
         },
         {
           color: "Черный",
           manufacturerColor: "Черный",
-          sizes: ["46 (S)", "48 (M)", "50 (L)", "54 (XL)", "56 (2XL)"]
+          sizes: ["46 (S)", "48 (M)", "50 (L)", "54 (XL)", "56 (XXL)"]
         }
       ]
     });

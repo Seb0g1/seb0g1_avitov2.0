@@ -115,7 +115,9 @@ export function normalizeFeedSize(size: string): string | null {
   }
 
   const code = text.match(/\(([^)]+)\)/)?.[1] ?? text;
-  const normalizedCode = code.toUpperCase() === "XXL" ? "2XL" : code.toUpperCase();
+  const normalizedCode = code.trim().toUpperCase().replace(/\s+/g, "") === "2XL"
+    ? "XXL"
+    : code.trim().toUpperCase();
   const byCode = clothingSizeOptions.find((option) => option.code.toUpperCase() === normalizedCode);
   return byCode?.value ?? null;
 }
