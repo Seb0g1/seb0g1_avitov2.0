@@ -3,6 +3,7 @@ import { VariantStatus } from "@prisma/client";
 import {
   getFeedValidationReasons,
   isActionableFeedStatus,
+  normalizeContactPhone,
   normalizeFeedSize
 } from "./feedRows";
 
@@ -22,6 +23,11 @@ describe("feed row validation", () => {
 
   it("rejects unsupported or empty sizes", () => {
     expect(normalizeFeedSize("Не указан")).toBeNull();
+  });
+
+  it("normalizes Russian contact phones with a plus prefix", () => {
+    expect(normalizeContactPhone("+7 977 827-45-40")).toBe("+79778274540");
+    expect(normalizeContactPhone("89778274540")).toBe("+79778274540");
   });
 
   it("skips rows without photos", () => {

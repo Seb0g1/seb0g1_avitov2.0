@@ -170,11 +170,11 @@ function getFeedGeo(overrides?: Record<string, unknown>) {
   };
 }
 
-function normalizeContactPhone(value: unknown) {
+export function normalizeContactPhone(value: unknown) {
   const text = String(value ?? "").trim();
   const digits = text.replace(/\D/g, "");
   if (digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))) {
-    return digits.startsWith("8") ? `7${digits.slice(1)}` : digits;
+    return digits.startsWith("8") ? `+7${digits.slice(1)}` : `+${digits}`;
   }
   return text;
 }
@@ -238,6 +238,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
   variantIds?: string[];
   statuses?: VariantStatus[];
 }): Promise<FeedDiagnosticsDto & { rows: FeedRow[] }> {
+  const storeContactPhone = normalizeContactPhone(env.STORE_PHONE);
   const variants = await prisma.variant.findMany({
     where: {
       ...(options?.variantIds?.length ? { id: { in: options.variantIds } } : {}),
@@ -402,7 +403,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       address: geo.address,
       latitude: geo.latitude,
       longitude: geo.longitude,
-      contactPhone: normalizeContactPhone(attributes.contactPhone ?? env.STORE_PHONE),
+      contactPhone: storeContactPhone,
       contactMethod: env.AVITO_FEED_CONTACT_METHOD,
       targetAudience: String(attributes.targetAudience ?? env.AVITO_FEED_TARGET_AUDIENCE),
       supplierName: supplier?.name ?? null,
