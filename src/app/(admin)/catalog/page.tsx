@@ -1,0 +1,30 @@
+import { CatalogClient } from "@/components/admin/CatalogClient";
+import { listProducts } from "@/server/modules/products/service";
+import { serializeProduct } from "@/server/modules/products/serialize";
+
+export const dynamic = "force-dynamic";
+
+type SearchParams = Promise<{
+  search?: string;
+  color?: string;
+  size?: string;
+  status?: string;
+  withoutSupplier?: string;
+}>;
+
+export default async function CatalogPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const products = (await listProducts(params)).map(serializeProduct);
+
+  return (
+    <div className="grid">
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">Каталог</p>
+          <h1>Товары и варианты</h1>
+        </div>
+      </header>
+      <CatalogClient products={products} />
+    </div>
+  );
+}

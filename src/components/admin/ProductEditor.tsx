@@ -1,0 +1,426 @@
+"use client";
+
+import { DragEvent, FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { VariantStatus } from "@prisma/client";
+import { Copy, ExternalLink, Save, Sparkles, Trash2, Upload } from "lucide-react";
+import type { ProductDto, VariantDto } from "@/types/catalog";
+import { StatusBadge } from "./StatusBadge";
+
+const statuses: VariantStatus[] = [
+  "DRAFT",
+  "READY",
+  "UPLOADED",
+  "ERROR",
+  "MODERATION",
+  "PUBLISHED",
+  "REMOVED"
+];
+
+async function jsonRequest(url: string, method: string, body: unknown) {
+  const response = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) {
+    const payload = (await response.json()) as { message?: string };
+    throw new Error(payload.message ?? "Запрос не выполнен.");
+  }
+  return response.json();
+}
+
+function variantBody(formData: FormData) {
+  return {
+    title: formData.get("title"),
+    color: formData.get("color"),
+    size: formData.get("size"),
+    price: formData.get("price"),
+    quantity: formData.get("quantity"),
+    description: formData.get("description"),
+    supplierUrl: formData.get("supplierUrl"),
+    supplierName: formData.get("supplierName"),
+    status: formData.get("status")
+  };
+}
+
+export function ProductEditor({ product }: { product: ProductDto }) {
+  const router = useRouter();
+  const [message, setMessage] = useState<string | null>(null);
+  const material =
+    typeof product.avitoAttributes?.material === "string"
+      ? product.avitoAttributes.material
+      : "100% Хлопок (Premium качество)";
+
+  async function updateProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    try {
+      await jsonRequest(`/api/products/${product.id}`, "PATCH", {
+        title: formData.get("title"),
+        brand: formData.get("brand"),
+        baseCategory: formData.get("baseCategory"),
+        baseDescription: formData.get("baseDescription"),
+        supplierUrl: formData.get("supplierUrl"),
+        supplierName: formData.get("supplierName"),
+        avitoAttributes: {
+          material: formData.get("material")
+        }
+      });
+      setMessage("Товар обновлен.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Ошибка обновления товара.");
+    }
+  }
+
+  async function createVariant(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    try {
+      await jsonRequest(`/api/products/${product.id}/variants`, "POST", variantBody(formData));
+      form.reset();
+      setMessage("Вариант добавлен.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Ошибка создания варианта.");
+    }
+  }
+
+  async function updateVariant(event: FormEvent<HTMLFormElement>, variantId: string) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    try {
+      await jsonRequest(`/api/variants/${variantId}`, "PATCH", variantBody(formData));
+      setMessage("Вариант сохранен.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Ошибка сохранения варианта.");
+    }
+  }
+
+  async function duplicateVariant(variantId: string) {
+    const response = await fetch(`/api/variants/${variantId}/duplicate`, { method: "POST" });
+    setMessage(response.ok ? "Вариант продублирован." : "Не удалось продублировать вариант.");
+    router.refresh();
+  }
+
+  async function removeVariant(variantId: string) {
+    const response = await fetch(`/api/variants/${variantId}`, { method: "DELETE" });
+    setMessage(response.ok ? "Вариант удален." : "Не удалось удалить вариант.");
+    router.refresh();
+  }
+
+  async function regenerateDescriptions() {
+    const response = await fetch(`/api/products/${product.id}/regenerate-descriptions`, { method: "POST" });
+    setMessage(response.ok ? "Описания сгенерированы заново." : "Не удалось сгенерировать описания.");
+    router.refresh();
+  }
+
+  async function uploadPhotos(variantId: string, files: FileList | File[]) {
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append("photos", file));
+    const response = await fetch(`/api/variants/${variantId}/photos`, {
+      method: "POST",
+      body: formData
+    });
+    setMessage(response.ok ? "Фото загружены." : "Не удалось загрузить фото.");
+    router.refresh();
+  }
+
+  async function removePhoto(photoId: string) {
+    const response = await fetch(`/api/photos/${photoId}`, { method: "DELETE" });
+    setMessage(response.ok ? "Фото удалено." : "Не удалось удалить фото.");
+    router.refresh();
+  }
+
+  return (
+    <div className="split">
+      <section className="editor-section">
+        <form className="grid" onSubmit={updateProduct}>
+          <div>
+            <p className="eyebrow">Parent product</p>
+            <h2>Карточка товара</h2>
+          </div>
+          <label>
+            Название
+            <input className="field" name="title" defaultValue={product.title} required />
+          </label>
+          <label>
+            Бренд
+            <input className="field" name="brand" defaultValue={product.brand ?? ""} />
+          </label>
+          <label>
+            Категория Avito
+            <input className="field" name="baseCategory" defaultValue={product.baseCategory} required />
+          </label>
+          <label>
+            Материал
+            <input className="field" name="material" defaultValue={material} required />
+          </label>
+          <label>
+            Название поставщика
+            <input className="field" name="supplierName" defaultValue={product.supplier?.name ?? ""} placeholder="МойСклад" />
+          </label>
+          <label>
+            Ссылка поставщика МойСклад
+            <input className="field" name="supplierUrl" defaultValue={product.supplier?.url ?? ""} />
+          </label>
+          <label>
+            Описание
+            <textarea className="textarea" name="baseDescription" defaultValue={product.baseDescription ?? ""} />
+          </label>
+          {product.supplier ? (
+            <div className="supplier-summary span-full">
+              <div>
+                <strong>{product.supplier.name ?? "МойСклад"}</strong>
+                <span>productId: {product.supplier.productId}</span>
+                <span>categoryId: {product.supplier.categoryId}</span>
+              </div>
+              <a className="button" href={product.supplier.url ?? "#"} target="_blank" rel="noreferrer">
+                <ExternalLink size={18} aria-hidden />
+                Открыть в МойСклад
+              </a>
+            </div>
+          ) : null}
+          <div className="toolbar span-full">
+            <button className="button primary" type="submit">
+              <Save size={18} aria-hidden />
+              Сохранить
+            </button>
+            <button className="button" type="button" onClick={regenerateDescriptions}>
+              <Sparkles size={18} aria-hidden />
+              Сгенерировать описания заново
+            </button>
+          </div>
+          {message ? <div className="muted">{message}</div> : null}
+        </form>
+      </section>
+
+      <section className="editor-section">
+        <div className="toolbar" style={{ justifyContent: "space-between" }}>
+          <div>
+            <p className="eyebrow">Variations</p>
+            <h2>Цвета, размеры и фото</h2>
+          </div>
+          <StatusBadge status={product.variants.some((variant) => variant.status === "ERROR") ? "ERROR" : "READY"} />
+        </div>
+
+        <form className="form-grid three" onSubmit={createVariant}>
+          <label>
+            Название
+            <input className="field" name="title" placeholder={`${product.title} Black M`} required />
+          </label>
+          <label>
+            Цвет
+            <input className="field" name="color" placeholder="Black" required />
+          </label>
+          <label>
+            Размер
+            <input className="field" name="size" placeholder="M" required />
+          </label>
+          <label>
+            Цена
+            <input className="field" name="price" type="number" min="0" step="0.01" required />
+          </label>
+          <label>
+            Количество
+            <input className="field" name="quantity" type="number" min="0" defaultValue="1" required />
+          </label>
+          <label>
+            Статус
+            <select className="select" name="status" defaultValue="DRAFT">
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="span-full">
+            Описание
+            <textarea className="textarea" name="description" />
+          </label>
+          <label className="span-full">
+            Ссылка поставщика для этого варианта
+            <input className="field" name="supplierUrl" placeholder="Оставьте пустым, чтобы наследовать от товара" />
+          </label>
+          <button className="button primary span-full" type="submit">
+            <Save size={18} aria-hidden />
+            Добавить вариант
+          </button>
+        </form>
+
+        <div className="variant-list" style={{ marginTop: 18 }}>
+          {product.variants.map((variant) => (
+            <VariantEditor
+              key={variant.id}
+              variant={variant}
+              onSubmit={updateVariant}
+              onDuplicate={duplicateVariant}
+              onRemove={removeVariant}
+              onUpload={uploadPhotos}
+              onRemovePhoto={removePhoto}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function VariantEditor({
+  variant,
+  onSubmit,
+  onDuplicate,
+  onRemove,
+  onUpload,
+  onRemovePhoto
+}: {
+  variant: VariantDto;
+  onSubmit: (event: FormEvent<HTMLFormElement>, variantId: string) => void;
+  onDuplicate: (variantId: string) => void;
+  onRemove: (variantId: string) => void;
+  onUpload: (variantId: string, files: FileList | File[]) => void;
+  onRemovePhoto: (photoId: string) => void;
+}) {
+  function drop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (event.dataTransfer.files.length > 0) {
+      onUpload(variant.id, event.dataTransfer.files);
+    }
+  }
+
+  return (
+    <div className="variant-row">
+      <form className="form-grid three" onSubmit={(event) => onSubmit(event, variant.id)}>
+        <label>
+          Название
+          <input className="field" name="title" defaultValue={variant.title} required />
+        </label>
+        <label>
+          Цвет
+          <input className="field" name="color" defaultValue={variant.color} required />
+        </label>
+        <label>
+          Размер
+          <input className="field" name="size" defaultValue={variant.size} required />
+        </label>
+        <label>
+          Цена
+          <input className="field" name="price" type="number" min="0" step="0.01" defaultValue={variant.price} />
+        </label>
+        <label>
+          Количество
+          <input className="field" name="quantity" type="number" min="0" defaultValue={variant.quantity} />
+        </label>
+        <label>
+          Статус
+          <select className="select" name="status" defaultValue={variant.status}>
+            {statuses.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="span-full">
+          Описание
+          <textarea className="textarea" name="description" defaultValue={variant.description ?? ""} />
+        </label>
+        <label>
+          Название поставщика
+          <input className="field" name="supplierName" defaultValue={variant.supplier?.name ?? ""} />
+        </label>
+        <label className="span-full">
+          Ссылка поставщика для этого варианта
+          <input
+            className="field"
+            name="supplierUrl"
+            defaultValue={variant.supplier?.url ?? ""}
+            placeholder={variant.effectiveSupplier ? "Наследуется от товара" : "https://b2b.moysklad.ru/public/..."}
+          />
+        </label>
+        <div className="span-full supplier-summary">
+          <div>
+            <strong>
+              {variant.effectiveSupplier
+                ? variant.supplier
+                  ? "Поставщик варианта"
+                  : "Наследуется от товара"
+                : "Поставщик не привязан"}
+            </strong>
+            {variant.effectiveSupplier ? (
+              <>
+                <span>productId: {variant.effectiveSupplier.productId}</span>
+                <span>categoryId: {variant.effectiveSupplier.categoryId}</span>
+              </>
+            ) : null}
+          </div>
+          {variant.effectiveSupplier?.url ? (
+            <a className="button" href={variant.effectiveSupplier.url} target="_blank" rel="noreferrer">
+              <ExternalLink size={18} aria-hidden />
+              Заказать у поставщика
+            </a>
+          ) : null}
+        </div>
+        <div className="span-full toolbar">
+          <StatusBadge status={variant.status} />
+          <button className="button primary" type="submit" title="Сохранить вариант">
+            <Save size={18} aria-hidden />
+            Сохранить
+          </button>
+          <button className="button" type="button" onClick={() => onDuplicate(variant.id)} title="Дублировать вариант">
+            <Copy size={18} aria-hidden />
+            Дублировать
+          </button>
+          <button className="button danger" type="button" onClick={() => onRemove(variant.id)} title="Удалить вариант">
+            <Trash2 size={18} aria-hidden />
+            Удалить
+          </button>
+          {variant.avitoItemId ? <span className="muted">Avito ID: {variant.avitoItemId}</span> : null}
+        </div>
+      </form>
+
+      <label
+        className="dropzone"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={drop}
+      >
+        <Upload size={22} aria-hidden />
+        Перетащите фото или выберите файлы
+        <input
+          type="file"
+          multiple
+          accept="image/png,image/jpeg,image/webp"
+          hidden
+          onChange={(event) => {
+            if (event.currentTarget.files) {
+              onUpload(variant.id, event.currentTarget.files);
+            }
+          }}
+        />
+      </label>
+
+      <div className="photo-strip">
+        {variant.photos.map((photo) => (
+          <span key={photo.id} style={{ position: "relative" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="photo-thumb" src={photo.publicUrl} alt="" />
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => onRemovePhoto(photo.id)}
+              title="Удалить фото"
+              style={{ position: "absolute", right: -6, top: -6, width: 28, height: 28, minHeight: 28 }}
+            >
+              <Trash2 size={14} aria-hidden />
+            </button>
+          </span>
+        ))}
+      </div>
+      {variant.lastError ? <div className="status ERROR">{variant.lastError}</div> : null}
+    </div>
+  );
+}

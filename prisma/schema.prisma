@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VariantStatus {
+  DRAFT
+  READY
+  UPLOADED
+  ERROR
+  MODERATION
+  PUBLISHED
+  REMOVED
+}
+
+enum PublicationMode {
+  AUTOLOAD_XML
+  AUTOLOAD_CSV
+  ITEMS_API
+}
+
+enum JobType {
+  PUBLICATION
+  EXPORT
+  STATUS_SYNC
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum FeedExportType {
+  AVITO_XML
+  AVITO_CSV
+  CATALOG_XLSX
+}
+
+enum FeedExportStatus {
+  CREATED
+  FAILED
+}
+
+enum LogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Product {
+  id              String    @id @default(cuid())
+  title           String
+  brand           String?
+  baseCategory    String
+  baseDescription String?
+  avitoAttributes Json?
+  supplierUrl     String?
+  supplierName    String?
+  supplierProductId String?
+  supplierCategoryId String?
+  supplierCatalogToken String?
+  supplierUpdatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  variants        Variant[]
+
+  @@index([title])
+  @@index([supplierProductId])
+}
+
+model Variant {
+  id              String        @id @default(cuid())
+  productId       String
+  title           String
+  color           String
+  size            String
+  price           Decimal       @db.Decimal(12, 2)
+  quantity        Int           @default(0)
+  description     String?
+  status          VariantStatus @default(DRAFT)
+  avitoItemId     String?       @unique
+  supplierUrl     String?
+  supplierName    String?
+  supplierProductId String?
+  supplierCategoryId String?
+  supplierCatalogToken String?
+  supplierUpdatedAt DateTime?
+  lastPublishedAt DateTime?
+  lastSyncedAt    DateTime?
+  lastError       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  photos          Photo[]
+
+  @@index([productId])
+  @@index([status])
+  @@index([color])
+  @@index([size])
+  @@index([supplierProductId])
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  variantId String
+  path      String
+  publicUrl String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  variant   Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId])
+}
+
+model FeedExport {
+  id        String           @id @default(cuid())
+  type      FeedExportType
+  status    FeedExportStatus @default(CREATED)
+  filePath  String
+  checksum  String
+  error     String?
+  createdAt DateTime         @default(now())
+}
+
+model PublicationJob {
+  id          String    @id @default(cuid())
+  type        JobType
+  status      JobStatus @default(QUEUED)
+  mode        PublicationMode?
+  attempts    Int       @default(0)
+  payload     Json
+  result      Json?
+  error       String?
+  queuedAt    DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+model ActionLog {
+  id        String   @id @default(cuid())
+  level     LogLevel @default(INFO)
+  message   String
+  context   Json?
+  createdAt DateTime @default(now())
+}
+
+model ErrorLog {
+  id        String   @id @default(cuid())
+  source    String
+  message   String
+  details   Json?
+  createdAt DateTime @default(now())
+}
