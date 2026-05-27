@@ -5,6 +5,7 @@ import { FeedExportType, VariantStatus } from "@prisma/client";
 import { resolveExportDir } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import { buildAvitoCsv } from "./csv";
+import { buildAvitoXlsx } from "./avitoXlsx";
 import { buildCatalogExcel } from "./excel";
 import { getFeedRows } from "./feedRows";
 import { buildAvitoXml } from "./xml";
@@ -41,6 +42,13 @@ export async function generateAvitoCsvExport(variantIds?: string[]) {
   const csv = buildAvitoCsv(rows);
   const exportRecord = await persistExport(FeedExportType.AVITO_CSV, csv, "csv");
   return { content: csv, exportRecord, rows };
+}
+
+export async function generateAvitoXlsxExport(variantIds?: string[]) {
+  const rows = await getFeedRows({ variantIds });
+  const buffer = await buildAvitoXlsx(rows);
+  const exportRecord = await persistExport(FeedExportType.CATALOG_XLSX, buffer, "xlsx");
+  return { content: buffer, exportRecord, rows };
 }
 
 export async function generateCatalogExcelExport() {

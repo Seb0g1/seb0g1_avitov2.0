@@ -20,6 +20,7 @@ export type ClothingFeedDefaults = {
   adType: string;
   condition: string;
   clothingItem: string;
+  productSubtype: string;
 };
 
 export const clothingFeedFieldMap: FeedFieldMap = {
@@ -41,5 +42,6 @@ export const clothingFeedDefaults: ClothingFeedDefaults = {
   goodsType: env.AVITO_FEED_GOODS_TYPE,
   adType: env.AVITO_FEED_AD_TYPE,
   condition: env.AVITO_FEED_CONDITION,
-  clothingItem: env.AVITO_FEED_APPAREL
+  clothingItem: env.AVITO_FEED_APPAREL,
+  productSubtype: env.AVITO_FEED_PRODUCT_SUBTYPE
 };

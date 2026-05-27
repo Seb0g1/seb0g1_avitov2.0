@@ -20,8 +20,12 @@ const envSchema = z.object({
     .default("POST"),
   AVITO_FEED_AD_TYPE: z.string().default("Товар приобретен на продажу"),
   AVITO_FEED_CONDITION: z.string().default("Новое с биркой"),
-  AVITO_FEED_APPAREL: z.string().default("Футболка"),
+  AVITO_FEED_APPAREL: z.string().default("Кофты и футболки"),
+  AVITO_FEED_PRODUCT_SUBTYPE: z.string().default("Футболка"),
   AVITO_FEED_GOODS_TYPE: z.string().default("Мужская одежда"),
+  AVITO_FEED_PLACEMENT_TYPE: z.string().default("Package"),
+  AVITO_FEED_CONTACT_METHOD: z.string().default("В сообщениях"),
+  AVITO_FEED_TARGET_AUDIENCE: z.string().default("Частные лица и бизнес"),
   AVITO_IMPORT_FETCH_DETAILS: z
     .string()
     .default("false")
@@ -38,6 +42,7 @@ const envSchema = z.object({
   STORE_LATITUDE: z.string().optional(),
   STORE_LONGITUDE: z.string().optional(),
   STORE_PHONE: z.string().default("+7 999 000-00-00"),
+  STORE_COMPANY_NAME: z.string().default("Точка Стиля"),
   DEFAULT_AVITO_CATEGORY: z.string().default("Одежда, обувь, аксессуары"),
   DEFAULT_CONDITION: z.string().default("Новое с биркой")
 });

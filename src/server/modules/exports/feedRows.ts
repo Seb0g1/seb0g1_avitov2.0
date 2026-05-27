@@ -27,6 +27,7 @@ export type FeedRow = {
   materials: string[];
   adType: string;
   clothingItem: string;
+  productSubtype: string;
   multiItemName: string;
   manufacturerColor: string;
   multiItem: boolean;
@@ -139,15 +140,13 @@ function getFeedGeo() {
   const region = safeText(env.STORE_REGION, safeFallbacks.region);
   const city = safeText(env.STORE_CITY, safeFallbacks.city);
   const address = safeText(env.STORE_ADDRESS, safeFallbacks.address);
-  const addressLooksExact =
+  const addressIsUsable =
     Boolean(address) &&
-    address.includes(",") &&
-    /\d/.test(address) &&
     !address.includes("<") &&
     !/пример/i.test(address);
 
   return {
-    ok: Boolean(region && city && (addressLooksExact || hasCoordinates)),
+    ok: Boolean(region && city && (addressIsUsable || hasCoordinates)),
     region,
     city,
     address,
@@ -311,10 +310,15 @@ export async function getFeedRowsWithDiagnostics(options?: {
       ["Condition"]
     );
     const adType = safeText(attributes.adType, clothingFeedDefaults.adType, ["AdType"]);
-    const clothingItem = safeText(attributes.clothingItem, clothingFeedDefaults.clothingItem, [
+    const clothingItem = safeText(attributes.apparel, clothingFeedDefaults.clothingItem, [
       "ClothingType",
       "Apparel"
     ]);
+    const productSubtype = safeText(
+      attributes.productSubtype ?? attributes.clothingSubtype ?? attributes.clothingItem,
+      clothingFeedDefaults.productSubtype,
+      ["Subtype"]
+    );
 
     return [{
       externalId: `${variant.productId}-${variant.id}`,
@@ -339,6 +343,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       condition,
       adType,
       clothingItem,
+      productSubtype,
       multiItemName: String(attributes.multiItemName ?? variant.product.title),
       manufacturerColor: String(manufacturerColors[variant.color] ?? variant.color),
       material,

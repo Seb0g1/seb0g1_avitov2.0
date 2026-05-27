@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { VariantStatus } from "@prisma/client";
 import ExcelJS from "exceljs";
 import type { FeedRow } from "./feedRows";
+import { avitoClothingSheetName, buildAvitoXlsx } from "./avitoXlsx";
 import { buildAvitoCsv } from "./csv";
 import { buildCatalogExcel } from "./excel";
 import { buildAvitoXml } from "./xml";
@@ -20,7 +21,8 @@ const rows: FeedRow[] = [
     material: "Хлопок",
     materials: ["Хлопок"],
     adType: "Товар приобретен на продажу",
-    clothingItem: "Футболка",
+    clothingItem: "Кофты и футболки",
+    productSubtype: "Футболка",
     multiItemName: "Nike Stussy",
     manufacturerColor: "Black",
     multiItem: true,
@@ -58,7 +60,8 @@ const rows: FeedRow[] = [
     material: "Хлопок",
     materials: ["Хлопок"],
     adType: "Товар приобретен на продажу",
-    clothingItem: "Футболка",
+    clothingItem: "Кофты и футболки",
+    productSubtype: "Футболка",
     multiItemName: "Nike Stussy",
     manufacturerColor: "Grey",
     multiItem: true,
@@ -92,7 +95,7 @@ describe("Avito exporters", () => {
     expect(xml).toContain("<Id>product-variant-black-m</Id>");
     expect(xml).toContain("<Color>Grey</Color>");
     expect(xml).toContain("<ManufacturerColor>Grey</ManufacturerColor>");
-    expect(xml).toContain("<Apparel>Футболка</Apparel>");
+    expect(xml).toContain("<Apparel>Кофты и футболки</Apparel>");
     expect(xml).not.toContain("<ClothingType>");
     expect(xml).toContain("<Condition>Новое с биркой</Condition>");
     expect(xml).toContain("<City>Москва</City>");
@@ -112,7 +115,27 @@ describe("Avito exporters", () => {
     expect(lines[1]).toContain('"Nike Stussy Black M"');
     expect(lines[1]).toContain('"Да";"MI-NIKESTUSSY"');
     expect(lines[0]).toContain('"Apparel"');
-    expect(lines[1]).toContain('"Товар приобретен на продажу";"Футболка"');
+    expect(lines[1]).toContain('"Товар приобретен на продажу";"Кофты и футболки"');
+  });
+
+  it("creates an Avito clothing XLSX template", async () => {
+    const buffer = await buildAvitoXlsx(rows);
+    const workbook = new ExcelJS.Workbook();
+    const arrayBuffer = buffer.buffer.slice(
+      buffer.byteOffset,
+      buffer.byteOffset + buffer.byteLength
+    ) as ArrayBuffer;
+    await workbook.xlsx.load(arrayBuffer);
+    const sheet = workbook.getWorksheet(avitoClothingSheetName);
+
+    expect(sheet?.getCell("A2").value).toBe("Уникальный идентификатор объявления");
+    expect(sheet?.getCell("U2").value).toBe("Тип товара");
+    expect(sheet?.getCell("W2").value).toBe("Подвид товара");
+    expect(sheet?.getCell("A5").value).toBe("AV-NIKESTUSSY-BLACK-M");
+    expect(sheet?.getCell("F5").value).toBe("https://example.com/black-m.jpg");
+    expect(sheet?.getCell("S5").value).toBe("Да");
+    expect(sheet?.getCell("U5").value).toBe("Кофты и футболки");
+    expect(sheet?.getCell("W5").value).toBe("Футболка");
   });
 
   it("adds supplier columns to Excel export", async () => {

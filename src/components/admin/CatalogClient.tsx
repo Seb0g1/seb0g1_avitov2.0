@@ -271,6 +271,10 @@ export function CatalogClient({
           <FileSpreadsheet size={18} aria-hidden />
           Экспорт в Excel
         </a>
+        <a className="button primary" href="/api/exports/avito.xlsx">
+          <FileSpreadsheet size={18} aria-hidden />
+          XLSX для Avito
+        </a>
         <a className="button" href="/api/exports/avito.xml">
           <Download size={18} aria-hidden />
           XML
