@@ -4,6 +4,10 @@ import { prisma } from "@/server/db";
 import {
   buildVariantArticle,
   buildVariantDescription,
+  clothingSizeOptions,
+  defaultAdType,
+  defaultClothingCondition,
+  defaultClothingItem,
   formatClothingMaterials,
   normalizeClothingMaterials,
   uniqueValues
@@ -54,10 +58,47 @@ const defaultFeedStatuses: VariantStatus[] = [
   VariantStatus.PUBLISHED
 ];
 
+const damagedTextMarker = "\uFFFD";
+const safeFallbacks = {
+  region: "Москва",
+  address: "Москва",
+  goodsType: "Мужская одежда"
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function safeText(value: unknown, fallback: string, placeholders: string[] = []) {
+  const text = String(value ?? "").trim();
+  if (!text || text.includes(damagedTextMarker) || placeholders.includes(text)) {
+    return fallback;
+  }
+
+  return text;
+}
+
+function normalizeFeedSize(size: string): string | null {
+  const text = size.trim();
+  const exact = clothingSizeOptions.find((option) => option.value === text);
+  if (exact) {
+    return exact.value;
+  }
+
+  const code = text.match(/\(([^)]+)\)/)?.[1] ?? text;
+  const normalizedCode = code.toUpperCase() === "XXL" ? "2XL" : code.toUpperCase();
+  const byCode = clothingSizeOptions.find((option) => option.code.toUpperCase() === normalizedCode);
+  return byCode?.value ?? null;
+}
+
+function isString(value: string | null): value is string {
+  return typeof value === "string";
+}
+
+function uniqueFeedSizes(sizes: string[]) {
+  return uniqueValues(sizes.map(normalizeFeedSize).filter(isString));
 }
 
 export async function getFeedRows(options?: {
@@ -86,25 +127,42 @@ export async function getFeedRows(options?: {
     orderBy: [{ product: { title: "asc" } }, { color: "asc" }, { size: "asc" }]
   });
 
-  return variants.map<FeedRow>((variant) => {
+  const seenVariantKeys = new Set<string>();
+
+  return variants.flatMap<FeedRow>((variant) => {
     const attributes = asRecord(variant.product.avitoAttributes);
     const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
     const material = formatClothingMaterials(materials);
     const manufacturerColors = asRecord(attributes.manufacturerColors);
-    const article = buildVariantArticle(variant.product.title, variant.color, variant.size);
-    const colors = uniqueValues(
-      variant.product.variants
-        .filter((productVariant) => productVariant.quantity > 0)
-        .map((productVariant) => productVariant.color)
-    );
-    const sizes = uniqueValues(
-      variant.product.variants
-        .filter((productVariant) => productVariant.quantity > 0)
-        .map((productVariant) => productVariant.size)
-    );
+    const size = normalizeFeedSize(variant.size);
+    if (!size) {
+      return [];
+    }
+
     const multiItemGroup = String(attributes.multiItemGroup ?? variant.productId);
+    const variantKey = `${multiItemGroup}:${variant.color.trim().toLowerCase()}:${size}`;
+    if (seenVariantKeys.has(variantKey)) {
+      return [];
+    }
+    seenVariantKeys.add(variantKey);
+
+    const article = buildVariantArticle(variant.product.title, variant.color, size);
+    const availableVariants = variant.product.variants
+      .filter((productVariant) => productVariant.quantity > 0)
+      .map((productVariant) => ({
+        color: productVariant.color,
+        size: normalizeFeedSize(productVariant.size)
+      }))
+      .filter(
+        (productVariant): productVariant is { color: string; size: string } =>
+          isString(productVariant.size)
+      );
+    const colors = uniqueValues(
+      availableVariants.map((productVariant) => productVariant.color)
+    );
+    const sizes = uniqueFeedSizes(availableVariants.map((productVariant) => productVariant.size));
     const supplier = resolveEffectiveSupplier(variant.product, variant);
-    return {
+    return [{
       externalId: `${variant.productId}-${variant.id}`,
       productId: variant.productId,
       variantId: variant.id,
@@ -123,10 +181,12 @@ export async function getFeedRows(options?: {
         }),
       brand: variant.product.brand,
       category: variant.product.baseCategory || clothingFeedFieldMap.category,
-      goodsType: String(attributes.goodsType ?? clothingFeedFieldMap.goodsType),
-      condition: String(attributes.condition ?? clothingFeedFieldMap.condition),
-      adType: String(attributes.adType ?? clothingFeedFieldMap.adType),
-      clothingItem: String(attributes.clothingItem ?? clothingFeedFieldMap.clothingItem),
+      goodsType: safeText(attributes.goodsType, safeFallbacks.goodsType, ["GoodsType"]),
+      condition: safeText(attributes.condition ?? env.DEFAULT_CONDITION, defaultClothingCondition, [
+        "Condition"
+      ]),
+      adType: safeText(attributes.adType, defaultAdType, ["AdType"]),
+      clothingItem: safeText(attributes.clothingItem, defaultClothingItem, ["ClothingType"]),
       multiItemName: String(attributes.multiItemName ?? variant.product.title),
       manufacturerColor: String(manufacturerColors[variant.color] ?? variant.color),
       material,
@@ -135,20 +195,20 @@ export async function getFeedRows(options?: {
       multiItemGroup,
       article,
       color: variant.color,
-      size: variant.size,
+      size,
       price: Number(variant.price),
       quantity: variant.quantity,
       status: variant.status,
       updatedAt: variant.updatedAt,
       avitoItemId: variant.avitoItemId,
       photos: variant.photos.map((photo) => photo.publicUrl),
-      region: env.STORE_REGION,
-      address: env.STORE_ADDRESS,
+      region: safeText(env.STORE_REGION, safeFallbacks.region),
+      address: safeText(env.STORE_ADDRESS, safeFallbacks.address),
       contactPhone: env.STORE_PHONE,
       supplierName: supplier?.name ?? null,
       supplierUrl: supplier?.url ?? null,
       supplierProductId: supplier?.productId ?? null,
       supplierCategoryId: supplier?.categoryId ?? null
-    };
+    }];
   });
 }
