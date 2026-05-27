@@ -115,9 +115,15 @@ export function normalizeFeedSize(size: string): string | null {
   }
 
   const code = text.match(/\(([^)]+)\)/)?.[1] ?? text;
-  const normalizedCode = code.trim().toUpperCase().replace(/\s+/g, "") === "2XL"
-    ? "XXL"
-    : code.trim().toUpperCase();
+  const compactCode = code.trim().toUpperCase().replace(/\s+/g, "");
+  const aliases: Record<string, string> = {
+    "2XL": "XXL",
+    ONE: "ONESIZE",
+    OS: "ONESIZE",
+    "БЕЗРАЗМЕРА": "NOSIZE",
+    "БЕЗРАЗМЕР": "NOSIZE"
+  };
+  const normalizedCode = aliases[compactCode] ?? compactCode;
   const byCode = clothingSizeOptions.find((option) => option.code.toUpperCase() === normalizedCode);
   return byCode?.value ?? null;
 }
@@ -139,13 +145,16 @@ function validCoordinate(value: string | undefined, min: number, max: number) {
   return Number.isFinite(number) && number >= min && number <= max ? value.trim() : null;
 }
 
-function getFeedGeo() {
-  const latitude = validCoordinate(env.STORE_LATITUDE, -90, 90);
-  const longitude = validCoordinate(env.STORE_LONGITUDE, -180, 180);
+function getFeedGeo(overrides?: Record<string, unknown>) {
+  const latitude = validCoordinate(String(overrides?.latitude ?? env.STORE_LATITUDE ?? ""), -90, 90);
+  const longitude = validCoordinate(String(overrides?.longitude ?? env.STORE_LONGITUDE ?? ""), -180, 180);
   const hasCoordinates = Boolean(latitude && longitude);
-  const region = safeText(env.STORE_REGION, safeFallbacks.region);
-  const city = safeText(env.STORE_CITY, safeFallbacks.city);
-  const address = safeText(env.STORE_ADDRESS, safeFallbacks.address);
+  const addressOverride = overrides?.address;
+  const cityOverride = overrides?.city;
+  const regionOverride = overrides?.region;
+  const region = safeText(regionOverride ?? env.STORE_REGION, safeFallbacks.region);
+  const city = safeText(cityOverride ?? env.STORE_CITY, safeFallbacks.city);
+  const address = safeText(addressOverride ?? env.STORE_ADDRESS, safeFallbacks.address);
   const addressIsUsable =
     Boolean(address) &&
     !address.includes("<") &&
@@ -159,6 +168,15 @@ function getFeedGeo() {
     latitude,
     longitude
   };
+}
+
+function normalizeContactPhone(value: unknown) {
+  const text = String(value ?? "").trim();
+  const digits = text.replace(/\D/g, "");
+  if (digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))) {
+    return digits.startsWith("8") ? `7${digits.slice(1)}` : digits;
+  }
+  return text;
 }
 
 function emptySummary(): Record<FeedSkipReason, number> {
@@ -244,9 +262,9 @@ export async function getFeedRowsWithDiagnostics(options?: {
 
   const seenVariantKeys = new Set<string>();
   const skipped: FeedSkipDto[] = [];
-  const geo = getFeedGeo();
   const rows = variants.flatMap<FeedRow>((variant) => {
     const attributes = asRecord(variant.product.avitoAttributes);
+    const geo = getFeedGeo(attributes);
     const categoryOption = getClothingCategoryOption(attributes.clothingCategory);
     const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
     const material = formatClothingMaterials(materials);
@@ -381,9 +399,9 @@ export async function getFeedRowsWithDiagnostics(options?: {
       address: geo.address,
       latitude: geo.latitude,
       longitude: geo.longitude,
-      contactPhone: env.STORE_PHONE,
+      contactPhone: normalizeContactPhone(attributes.contactPhone ?? env.STORE_PHONE),
       contactMethod: env.AVITO_FEED_CONTACT_METHOD,
-      targetAudience: env.AVITO_FEED_TARGET_AUDIENCE,
+      targetAudience: String(attributes.targetAudience ?? env.AVITO_FEED_TARGET_AUDIENCE),
       supplierName: supplier?.name ?? null,
       supplierUrl: supplier?.url ?? null,
       supplierProductId: supplier?.productId ?? null,

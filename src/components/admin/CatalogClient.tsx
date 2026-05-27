@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState, useTransition } from "react";
+import { ChangeEvent, FormEvent, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PublicationMode, VariantStatus } from "@prisma/client";
@@ -15,7 +15,8 @@ import {
   RefreshCw,
   Rocket,
   Search,
-  Trash2
+  Trash2,
+  Upload
 } from "lucide-react";
 import type { FeedDiagnosticsDto, ProductDto } from "@/types/catalog";
 import {
@@ -71,6 +72,8 @@ export function CatalogClient({
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+  const [isImportingXlsx, setIsImportingXlsx] = useState(false);
+  const xlsxInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
 
   const rows = useMemo(() => buildCatalogProductRows(products), [products]);
@@ -205,6 +208,47 @@ export function CatalogClient({
     startTransition(() => router.refresh());
   }
 
+  async function importFromXlsx(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setIsImportingXlsx(true);
+    setMessage("Импортирую XLSX из Avito...");
+    const formData = new FormData();
+    formData.set("file", file);
+
+    try {
+      const response = await fetch("/api/imports/avito-xlsx", {
+        method: "POST",
+        body: formData
+      });
+      const body = (await response.json().catch(() => null)) as {
+        rows?: number;
+        productsCreated?: number;
+        productsUpdated?: number;
+        variantsCreated?: number;
+        variantsUpdated?: number;
+        photosAttached?: number;
+        message?: string;
+      } | null;
+
+      if (!response.ok) {
+        setMessage(body?.message ?? "Не удалось импортировать XLSX.");
+        return;
+      }
+
+      setMessage(
+        `XLSX импортирован: строк ${body?.rows ?? 0}, товаров создано ${body?.productsCreated ?? 0}, обновлено ${body?.productsUpdated ?? 0}, вариантов создано ${body?.variantsCreated ?? 0}, обновлено ${body?.variantsUpdated ?? 0}, фото добавлено ${body?.photosAttached ?? 0}.`
+      );
+      startTransition(() => router.refresh());
+    } finally {
+      setIsImportingXlsx(false);
+    }
+  }
+
   return (
     <div className="grid">
       <form className="toolbar" onSubmit={applyFilters}>
@@ -290,6 +334,22 @@ export function CatalogClient({
         <button className="button primary" type="button" onClick={importFromAvito} disabled={isPending}>
           <RefreshCw size={18} aria-hidden />
           Импорт из Avito
+        </button>
+        <input
+          ref={xlsxInputRef}
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          style={{ display: "none" }}
+          onChange={importFromXlsx}
+        />
+        <button
+          className="button primary"
+          type="button"
+          onClick={() => xlsxInputRef.current?.click()}
+          disabled={isImportingXlsx}
+        >
+          <Upload size={18} aria-hidden />
+          Импорт XLSX
         </button>
       </div>
 

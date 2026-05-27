@@ -15,11 +15,12 @@ describe("feed row validation", () => {
     expect(normalizeFeedSize("XXL")).toBe("56 (XXL)");
     expect(normalizeFeedSize("2XL")).toBe("56 (XXL)");
     expect(normalizeFeedSize("56 (2XL)")).toBe("56 (XXL)");
+    expect(normalizeFeedSize("XS")).toBe("42 (XS)");
+    expect(normalizeFeedSize("3XL")).toBe("60 (3XL)");
+    expect(normalizeFeedSize("one size")).toBe("One size");
   });
 
   it("rejects unsupported or empty sizes", () => {
-    expect(normalizeFeedSize("XS")).toBeNull();
-    expect(normalizeFeedSize("3XL")).toBeNull();
     expect(normalizeFeedSize("Не указан")).toBeNull();
   });
 
