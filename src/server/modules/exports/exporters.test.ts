@@ -96,6 +96,7 @@ describe("Avito exporters", () => {
     expect(xml).toContain("<Color>Grey</Color>");
     expect(xml).toContain("<ManufacturerColor>Grey</ManufacturerColor>");
     expect(xml).toContain("<Apparel>Кофты и футболки</Apparel>");
+    expect(xml).toContain("<GoodsSubType>Футболка</GoodsSubType>");
     expect(xml).not.toContain("<ClothingType>");
     expect(xml).toContain("<Condition>Новое с биркой</Condition>");
     expect(xml).toContain("<City>Москва</City>");

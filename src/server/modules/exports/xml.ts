@@ -15,6 +15,7 @@ export function buildAvitoXml(rows: FeedRow[]) {
     ad.ele("GoodsType").txt(row.goodsType);
     ad.ele(clothingFeedFieldMap.adType).txt(row.adType);
     ad.ele(clothingFeedFieldMap.clothingItem).txt(row.clothingItem);
+    ad.ele(clothingFeedFieldMap.productSubtype).txt(row.productSubtype);
     ad.ele("Title").txt(row.title);
     ad.ele("Description").dat(row.description);
     ad.ele("Price").txt(String(Math.round(row.price)));

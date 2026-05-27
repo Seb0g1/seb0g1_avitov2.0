@@ -65,7 +65,7 @@ const damagedTextMarker = "\uFFFD";
 const safeFallbacks = {
   region: "Москва",
   city: "Москва",
-  address: ""
+  address: "Москва"
 };
 
 const feedSkipReasons: FeedSkipReason[] = [
@@ -266,9 +266,9 @@ export async function getFeedRowsWithDiagnostics(options?: {
         variant.product.title,
         variant.product.baseCategory,
         variant.product.brand,
-        env.STORE_REGION,
-        env.STORE_CITY,
-        env.STORE_ADDRESS
+        geo.region,
+        geo.city,
+        geo.address
       ]
     });
 

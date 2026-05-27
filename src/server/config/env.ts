@@ -21,6 +21,7 @@ const envSchema = z.object({
   AVITO_FEED_AD_TYPE: z.string().default("Товар приобретен на продажу"),
   AVITO_FEED_CONDITION: z.string().default("Новое с биркой"),
   AVITO_FEED_APPAREL: z.string().default("Кофты и футболки"),
+  AVITO_FEED_PRODUCT_SUBTYPE_FIELD: z.string().default("GoodsSubType"),
   AVITO_FEED_PRODUCT_SUBTYPE: z.string().default("Футболка"),
   AVITO_FEED_GOODS_TYPE: z.string().default("Мужская одежда"),
   AVITO_FEED_PLACEMENT_TYPE: z.string().default("Package"),

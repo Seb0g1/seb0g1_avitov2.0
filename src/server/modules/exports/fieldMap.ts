@@ -5,6 +5,7 @@ export type FeedFieldMap = {
   material: string;
   adType: string;
   clothingItem: string;
+  productSubtype: string;
   multiItemName: string;
   manufacturerColor: string;
   multiItem: string;
@@ -28,6 +29,7 @@ export const clothingFeedFieldMap: FeedFieldMap = {
   material: "Material",
   adType: "AdType",
   clothingItem: "Apparel",
+  productSubtype: env.AVITO_FEED_PRODUCT_SUBTYPE_FIELD,
   multiItemName: "MultiItemName",
   manufacturerColor: "ManufacturerColor",
   multiItem: "MultiItem",
