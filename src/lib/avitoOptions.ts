@@ -30,6 +30,72 @@ export const defaultAdType = "Товар приобретен на продаж�
 export const defaultClothingCondition = "Новое с биркой";
 export const defaultClothingItem = "Футболка";
 
+export type ClothingCategoryKey = "shirts" | "shorts" | "tracksuits" | "jeans" | "bombers";
+
+export type ClothingCategoryOption = {
+  key: ClothingCategoryKey;
+  label: string;
+  goodsType: string;
+  apparel: string;
+  productSubtype: string;
+  extraField?: string;
+  extraValue?: string;
+};
+
+export const clothingCategoryOptions: readonly ClothingCategoryOption[] = [
+  {
+    key: "shirts",
+    label: "Кофты и футболки",
+    goodsType: "Мужская одежда",
+    apparel: "Кофты и футболки",
+    productSubtype: "Футболка",
+    extraField: "GoodsSubType",
+    extraValue: "Футболка"
+  },
+  {
+    key: "shorts",
+    label: "Шорты",
+    goodsType: "Мужская одежда",
+    apparel: "Шорты",
+    productSubtype: "Шорты",
+    extraField: "ShortsStyle",
+    extraValue: "Повседневные"
+  },
+  {
+    key: "tracksuits",
+    label: "Спортивные костюмы",
+    goodsType: "Мужская одежда",
+    apparel: "Спортивные костюмы",
+    productSubtype: "Спортивный костюм"
+  },
+  {
+    key: "jeans",
+    label: "Джинсы",
+    goodsType: "Мужская одежда",
+    apparel: "Джинсы",
+    productSubtype: "Джинсы"
+  },
+  {
+    key: "bombers",
+    label: "Бомберы",
+    goodsType: "Верхняя одежда",
+    apparel: "Бомберы",
+    productSubtype: "Бомбер",
+    extraField: "ApparelType",
+    extraValue: "Бомбер"
+  }
+] as const;
+
+export const defaultClothingCategory = "shirts";
+
+export function getClothingCategoryOption(input?: unknown) {
+  const value = String(input ?? "").trim();
+  return (
+    clothingCategoryOptions.find((option) => option.key === value || option.label === value) ??
+    clothingCategoryOptions[0]
+  );
+}
+
 const materialAliases: Array<[string, string]> = [
   ["хлоп", "Хлопок"],
   ["полиэстер", "Полиэстер"],

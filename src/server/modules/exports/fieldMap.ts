@@ -26,12 +26,12 @@ export type ClothingFeedDefaults = {
 
 export const clothingFeedFieldMap: FeedFieldMap = {
   category: env.DEFAULT_AVITO_CATEGORY,
-  material: "Material",
+  material: "MaterialsOdezhda",
   adType: "AdType",
   clothingItem: "Apparel",
   productSubtype: env.AVITO_FEED_PRODUCT_SUBTYPE_FIELD,
-  multiItemName: "MultiItemName",
-  manufacturerColor: "ManufacturerColor",
+  multiItemName: "MultiName",
+  manufacturerColor: "ColorName",
   multiItem: "MultiItem",
   multiItemGroup: "MultiItemGroup",
   article: "Article",

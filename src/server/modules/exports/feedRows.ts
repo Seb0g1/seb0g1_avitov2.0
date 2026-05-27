@@ -1,4 +1,5 @@
 import { VariantStatus } from "@prisma/client";
+import { getClothingCategoryOption } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import {
@@ -28,6 +29,7 @@ export type FeedRow = {
   adType: string;
   clothingItem: string;
   productSubtype: string;
+  categorySpecificFields: Array<{ tag: string; value: string }>;
   multiItemName: string;
   manufacturerColor: string;
   multiItem: boolean;
@@ -47,6 +49,8 @@ export type FeedRow = {
   latitude: string | null;
   longitude: string | null;
   contactPhone: string;
+  contactMethod: string;
+  targetAudience: string;
   supplierName: string | null;
   supplierUrl: string | null;
   supplierProductId: string | null;
@@ -65,7 +69,7 @@ const damagedTextMarker = "\uFFFD";
 const safeFallbacks = {
   region: "Москва",
   city: "Москва",
-  address: "Москва"
+  address: "г.Москва"
 };
 
 const feedSkipReasons: FeedSkipReason[] = [
@@ -241,6 +245,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
   const geo = getFeedGeo();
   const rows = variants.flatMap<FeedRow>((variant) => {
     const attributes = asRecord(variant.product.avitoAttributes);
+    const categoryOption = getClothingCategoryOption(attributes.clothingCategory);
     const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
     const material = formatClothingMaterials(materials);
     const manufacturerColors = asRecord(attributes.manufacturerColors);
@@ -303,22 +308,31 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const sizes = uniqueFeedSizes(availableVariants.map((productVariant) => productVariant.size));
     const supplier = resolveEffectiveSupplier(variant.product, variant);
     const category = safeText(variant.product.baseCategory, clothingFeedFieldMap.category);
-    const goodsType = safeText(attributes.goodsType, clothingFeedDefaults.goodsType, ["GoodsType"]);
+    const goodsType = safeText(attributes.goodsType, categoryOption.goodsType, ["GoodsType"]);
     const condition = safeText(
       attributes.condition ?? env.DEFAULT_CONDITION,
       clothingFeedDefaults.condition,
       ["Condition"]
     );
     const adType = safeText(attributes.adType, clothingFeedDefaults.adType, ["AdType"]);
-    const clothingItem = safeText(attributes.apparel, clothingFeedDefaults.clothingItem, [
+    const clothingItem = safeText(attributes.apparel, categoryOption.apparel, [
       "ClothingType",
       "Apparel"
     ]);
     const productSubtype = safeText(
       attributes.productSubtype ?? attributes.clothingSubtype ?? attributes.clothingItem,
-      clothingFeedDefaults.productSubtype,
+      categoryOption.productSubtype || clothingFeedDefaults.productSubtype,
       ["Subtype"]
     );
+    const categoryExtraField = safeText(attributes.categoryExtraField, categoryOption.extraField ?? "");
+    const categoryExtraValue = safeText(
+      attributes.categoryExtraValue,
+      categoryOption.extraValue ?? productSubtype
+    );
+    const categorySpecificFields =
+      categoryExtraField && categoryExtraValue
+        ? [{ tag: categoryExtraField, value: categoryExtraValue }]
+        : [];
 
     return [{
       externalId: `${variant.productId}-${variant.id}`,
@@ -344,6 +358,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       adType,
       clothingItem,
       productSubtype,
+      categorySpecificFields,
       multiItemName: String(attributes.multiItemName ?? variant.product.title),
       manufacturerColor: String(manufacturerColors[variant.color] ?? variant.color),
       material,
@@ -365,6 +380,8 @@ export async function getFeedRowsWithDiagnostics(options?: {
       latitude: geo.latitude,
       longitude: geo.longitude,
       contactPhone: env.STORE_PHONE,
+      contactMethod: env.AVITO_FEED_CONTACT_METHOD,
+      targetAudience: env.AVITO_FEED_TARGET_AUDIENCE,
       supplierName: supplier?.name ?? null,
       supplierUrl: supplier?.url ?? null,
       supplierProductId: supplier?.productId ?? null,

@@ -17,8 +17,10 @@ import {
 } from "lucide-react";
 import {
   clothingMaterialOptions,
+  clothingCategoryOptions,
   clothingSizeOptions,
   defaultAdType,
+  defaultClothingCategory,
   defaultClothingCondition,
   defaultClothingItem,
   defaultClothingMaterials,
@@ -132,6 +134,7 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
   const [materials, setMaterials] = useState<string[]>([...defaultClothingMaterials]);
   const [adType, setAdType] = useState(defaultAdType);
   const [condition, setCondition] = useState(defaultClothingCondition);
+  const [clothingCategory, setClothingCategory] = useState(defaultClothingCategory);
   const [clothingItem, setClothingItem] = useState(defaultClothingItem);
   const [multiItemName, setMultiItemName] = useState("");
   const [price, setPrice] = useState("");
@@ -148,6 +151,9 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
   const variantCount = colorGroups.reduce((count, group) => count + group.sizes.length, 0);
   const firstPhoto = activeGroup?.photos[0]?.previewUrl;
   const effectiveMultiItemName = multiItemName.trim() || title.trim() || "Название мультиобъявления";
+  const selectedClothingCategory =
+    clothingCategoryOptions.find((option) => option.key === clothingCategory) ??
+    clothingCategoryOptions[0];
 
   const preview = useMemo(
     () => ({
@@ -307,6 +313,14 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
         adType,
         condition,
         clothingItem,
+        avitoAttributes: {
+          clothingCategory,
+          goodsType: selectedClothingCategory.goodsType,
+          apparel: selectedClothingCategory.apparel,
+          productSubtype: clothingItem,
+          categoryExtraField: selectedClothingCategory.extraField,
+          categoryExtraValue: selectedClothingCategory.extraValue
+        },
         multiItemName: effectiveMultiItemName,
         price,
         quantity,
@@ -397,6 +411,27 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
                   {initialCategories.map((category) => (
                     <option key={category} value={category}>
                       {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="span-full">
+                Категория одежды
+                <select
+                  className="select"
+                  value={clothingCategory}
+                  onChange={(event) => {
+                    const next =
+                      clothingCategoryOptions.find((option) => option.key === event.target.value) ??
+                      clothingCategoryOptions[0];
+                    setClothingCategory(next.key);
+                    setClothingItem(next.productSubtype);
+                  }}
+                  required
+                >
+                  {clothingCategoryOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.goodsType} / {option.label}
                     </option>
                   ))}
                 </select>
@@ -607,7 +642,7 @@ export function ProductCreationWizard({ initialCategories }: { initialCategories
             </div>
             <div className="form-grid">
               <label>
-                Предмет одежды
+                Подвид товара
                 <input
                   className="field"
                   value={clothingItem}

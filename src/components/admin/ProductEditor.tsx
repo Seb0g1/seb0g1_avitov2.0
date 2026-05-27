@@ -6,7 +6,9 @@ import type { VariantStatus } from "@prisma/client";
 import { Copy, ExternalLink, Save, Sparkles, Trash2, Upload } from "lucide-react";
 import {
   clothingMaterialOptions,
+  clothingCategoryOptions,
   defaultAdType,
+  defaultClothingCategory,
   defaultClothingCondition,
   defaultClothingItem,
   formatClothingMaterials,
@@ -62,7 +64,15 @@ export function ProductEditor({ product }: { product: ProductDto }) {
   );
   const adType = String(attributes.adType ?? defaultAdType);
   const condition = String(attributes.condition ?? defaultClothingCondition);
-  const clothingItem = String(attributes.clothingItem ?? defaultClothingItem);
+  const clothingCategory = String(attributes.clothingCategory ?? defaultClothingCategory);
+  const selectedClothingCategory =
+    clothingCategoryOptions.find((option) => option.key === clothingCategory) ??
+    clothingCategoryOptions[0];
+  const clothingItem = String(
+    attributes.productSubtype ?? attributes.clothingItem ?? selectedClothingCategory.productSubtype ?? defaultClothingItem
+  );
+  const [editingClothingCategory, setEditingClothingCategory] = useState(selectedClothingCategory.key);
+  const [editingClothingItem, setEditingClothingItem] = useState(clothingItem);
   const multiItemName = String(attributes.multiItemName ?? product.title);
 
   function toggleProductMaterial(material: string) {
@@ -85,6 +95,9 @@ export function ProductEditor({ product }: { product: ProductDto }) {
   async function updateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const nextClothingCategory =
+      clothingCategoryOptions.find((option) => option.key === formData.get("clothingCategory")) ??
+      selectedClothingCategory;
     try {
       await jsonRequest(`/api/products/${product.id}`, "PATCH", {
         title: formData.get("title"),
@@ -98,7 +111,13 @@ export function ProductEditor({ product }: { product: ProductDto }) {
           materials: selectedMaterials,
           adType: formData.get("adType"),
           condition: formData.get("condition"),
-          clothingItem: formData.get("clothingItem"),
+          clothingCategory: formData.get("clothingCategory"),
+          goodsType: nextClothingCategory.goodsType,
+          apparel: nextClothingCategory.apparel,
+          productSubtype: formData.get("clothingItem") || nextClothingCategory.productSubtype,
+          categoryExtraField: nextClothingCategory.extraField,
+          categoryExtraValue: nextClothingCategory.extraValue,
+          clothingItem: formData.get("clothingItem") || nextClothingCategory.productSubtype,
           multiItemName: formData.get("multiItemName")
         }
       });
@@ -191,6 +210,28 @@ export function ProductEditor({ product }: { product: ProductDto }) {
             <input className="field" name="baseCategory" defaultValue={product.baseCategory} required />
           </label>
           <label>
+            Категория одежды
+            <select
+              className="select"
+              name="clothingCategory"
+              value={editingClothingCategory}
+              onChange={(event) => {
+                const next =
+                  clothingCategoryOptions.find((option) => option.key === event.target.value) ??
+                  clothingCategoryOptions[0];
+                setEditingClothingCategory(next.key);
+                setEditingClothingItem(next.productSubtype);
+              }}
+              required
+            >
+              {clothingCategoryOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.goodsType} / {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             Вид объявления
             <input className="field" name="adType" defaultValue={adType} required />
           </label>
@@ -199,8 +240,14 @@ export function ProductEditor({ product }: { product: ProductDto }) {
             <input className="field" name="condition" defaultValue={condition} required />
           </label>
           <label>
-            Предмет одежды
-            <input className="field" name="clothingItem" defaultValue={clothingItem} required />
+            Подвид товара
+            <input
+              className="field"
+              name="clothingItem"
+              value={editingClothingItem}
+              onChange={(event) => setEditingClothingItem(event.target.value)}
+              required
+            />
           </label>
           <label>
             Название мультиобъявления

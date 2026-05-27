@@ -23,6 +23,7 @@ const rows: FeedRow[] = [
     adType: "Товар приобретен на продажу",
     clothingItem: "Кофты и футболки",
     productSubtype: "Футболка",
+    categorySpecificFields: [{ tag: "GoodsSubType", value: "Футболка" }],
     multiItemName: "Nike Stussy",
     manufacturerColor: "Black",
     multiItem: true,
@@ -42,6 +43,8 @@ const rows: FeedRow[] = [
     latitude: null,
     longitude: null,
     contactPhone: "+7 999 000-00-00",
+    contactMethod: "В сообщениях",
+    targetAudience: "Частные лица и бизнес",
     supplierName: "МойСклад",
     supplierUrl: "https://b2b.moysklad.ru/public/token/catalog?categoryId=category&productId=product",
     supplierProductId: "product",
@@ -62,6 +65,7 @@ const rows: FeedRow[] = [
     adType: "Товар приобретен на продажу",
     clothingItem: "Кофты и футболки",
     productSubtype: "Футболка",
+    categorySpecificFields: [{ tag: "GoodsSubType", value: "Футболка" }],
     multiItemName: "Nike Stussy",
     manufacturerColor: "Grey",
     multiItem: true,
@@ -81,6 +85,8 @@ const rows: FeedRow[] = [
     latitude: null,
     longitude: null,
     contactPhone: "+7 999 000-00-00",
+    contactMethod: "В сообщениях",
+    targetAudience: "Частные лица и бизнес",
     supplierName: "МойСклад",
     supplierUrl: "https://b2b.moysklad.ru/public/token/catalog?categoryId=category&productId=product",
     supplierProductId: "product",
@@ -94,18 +100,49 @@ describe("Avito exporters", () => {
     expect(xml.match(/<Ad>/g)).toHaveLength(2);
     expect(xml).toContain("<Id>product-variant-black-m</Id>");
     expect(xml).toContain("<Color>Grey</Color>");
-    expect(xml).toContain("<ManufacturerColor>Grey</ManufacturerColor>");
+    expect(xml).toContain("<ColorName>Grey</ColorName>");
     expect(xml).toContain("<Apparel>Кофты и футболки</Apparel>");
     expect(xml).toContain("<GoodsSubType>Футболка</GoodsSubType>");
     expect(xml).not.toContain("<ClothingType>");
     expect(xml).toContain("<Condition>Новое с биркой</Condition>");
-    expect(xml).toContain("<City>Москва</City>");
+    expect(xml).toContain("<Address>Россия, Москва, Тверская улица, 1</Address>");
     expect(xml).toContain("<Size>50 (L)</Size>");
     expect(xml).toContain("<MultiItem>Да</MultiItem>");
-    expect(xml).toContain("<MultiItemGroup>MI-NIKESTUSSY</MultiItemGroup>");
-    expect(xml).toContain("<MultiItemName>Nike Stussy</MultiItemName>");
+    expect(xml).toContain("<MultiName>Nike Stussy</MultiName>");
     expect(xml).not.toContain("����");
     expect(xml).not.toContain("Рњ");
+  });
+
+  it("uses category-specific XML fields from Avito clothing templates", () => {
+    const xml = buildAvitoXml([
+      {
+        ...rows[0],
+        externalId: "bomber-row",
+        goodsType: "Верхняя одежда",
+        clothingItem: "Бомберы",
+        productSubtype: "Бомбер",
+        categorySpecificFields: [{ tag: "ApparelType", value: "Бомбер" }]
+      },
+      {
+        ...rows[0],
+        externalId: "shorts-row",
+        clothingItem: "Шорты",
+        productSubtype: "Шорты",
+        categorySpecificFields: [{ tag: "ShortsStyle", value: "Повседневные" }]
+      },
+      {
+        ...rows[0],
+        externalId: "jeans-row",
+        clothingItem: "Джинсы",
+        productSubtype: "Джинсы",
+        categorySpecificFields: []
+      }
+    ]);
+
+    expect(xml).toContain("<ApparelType>Бомбер</ApparelType>");
+    expect(xml).toContain("<ShortsStyle>Повседневные</ShortsStyle>");
+    expect(xml).toContain("<Apparel>Джинсы</Apparel>");
+    expect(xml).not.toContain("<GoodsSubType>Джинсы</GoodsSubType>");
   });
 
   it("creates one CSV row per variant plus header", () => {

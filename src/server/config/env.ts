@@ -39,10 +39,11 @@ const envSchema = z.object({
   FEED_PUBLIC_TOKEN: z.string().default("dev-feed-token"),
   STORE_REGION: z.string().default("Москва"),
   STORE_CITY: z.string().default("Москва"),
-  STORE_ADDRESS: z.string().default("Россия, Москва, <улица>, <дом>"),
+  STORE_ADDRESS: z.string().default("г.Москва"),
   STORE_LATITUDE: z.string().optional(),
   STORE_LONGITUDE: z.string().optional(),
-  STORE_PHONE: z.string().default("+7 999 000-00-00"),
+  STORE_PHONE: z.string().default("+79778274540"),
+  STORE_EMAIL: z.string().email().default("seboggame@gmail.com"),
   STORE_COMPANY_NAME: z.string().default("Точка Стиля"),
   DEFAULT_AVITO_CATEGORY: z.string().default("Одежда, обувь, аксессуары"),
   DEFAULT_CONDITION: z.string().default("Новое с биркой")

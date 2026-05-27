@@ -2,8 +2,10 @@ import crypto from "node:crypto";
 import { Prisma, VariantStatus } from "@prisma/client";
 import {
   defaultAdType,
+  defaultClothingCategory,
   defaultClothingCondition,
   defaultClothingItem,
+  getClothingCategoryOption,
   normalizeClothingMaterials
 } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
@@ -45,19 +47,27 @@ function productAttributes(input: {
   avitoAttributes?: Record<string, unknown> | null;
 }) {
   const existing = asRecord(input.avitoAttributes);
+  const categoryOption = getClothingCategoryOption(existing.clothingCategory ?? defaultClothingCategory);
   const materials = normalizeClothingMaterials(input.materials ?? existing.materials, input.material ?? existing.material);
   const seed = crypto.randomUUID();
   const manufacturerColors = {
     ...(asRecord(existing.manufacturerColors) as Record<string, string>),
     ...(input.manufacturerColors ?? {})
   };
+  const productSubtype = input.clothingItem?.trim() || String(existing.productSubtype ?? existing.clothingItem ?? categoryOption.productSubtype);
   return {
     ...existing,
     materials,
     material: materials.join(", "),
     adType: input.adType?.trim() || String(existing.adType ?? defaultAdType),
     condition: input.condition?.trim() || String(existing.condition ?? defaultClothingCondition),
-    clothingItem: input.clothingItem?.trim() || String(existing.clothingItem ?? defaultClothingItem),
+    clothingCategory: categoryOption.key,
+    goodsType: String(existing.goodsType ?? categoryOption.goodsType),
+    apparel: String(existing.apparel ?? categoryOption.apparel),
+    productSubtype,
+    categoryExtraField: String(existing.categoryExtraField ?? categoryOption.extraField ?? ""),
+    categoryExtraValue: String(existing.categoryExtraValue ?? categoryOption.extraValue ?? productSubtype),
+    clothingItem: productSubtype || String(existing.clothingItem ?? defaultClothingItem),
     multiItemName: input.multiItemName?.trim() || String(existing.multiItemName ?? input.title),
     manufacturerColors,
     sizeGrid: clothingSizeValues,

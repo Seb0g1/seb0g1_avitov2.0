@@ -139,7 +139,7 @@ function avitoRow(row: FeedRow) {
     env.AVITO_FEED_TARGET_AUDIENCE,
     "",
     "",
-    env.ADMIN_EMAIL,
+    env.STORE_EMAIL,
     env.STORE_COMPANY_NAME
   ];
 }
