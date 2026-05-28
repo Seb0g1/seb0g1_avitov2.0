@@ -9,6 +9,8 @@ type AvitoRecord = Record<string, unknown>;
 
 type NormalizedAvitoItem = {
   avitoItemId: string;
+  sourceExternalId: string | null;
+  localExternalId: LocalFeedExternalId | null;
   title: string;
   productTitle: string;
   productGroupKey: string | null;
@@ -24,6 +26,16 @@ type NormalizedAvitoItem = {
   photos: string[];
   url: string | null;
   raw: AvitoRecord;
+};
+
+type LocalFeedExternalId = {
+  productId: string;
+  variantId: string;
+};
+
+type ExistingImportMatch = {
+  variant: Awaited<ReturnType<typeof findVariantByAvitoId>> | null;
+  duplicateVariant: Awaited<ReturnType<typeof findVariantByAvitoId>> | null;
 };
 
 const sizeTokens = new Set([
@@ -112,6 +124,7 @@ const knownBrands = [
 ];
 
 const UNKNOWN_VALUE = "Не указан";
+const localIdPattern = /^c[a-z0-9]{10,}$/i;
 
 function record(value: unknown): AvitoRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as AvitoRecord) : {};
@@ -146,6 +159,26 @@ function firstNumber(...values: unknown[]) {
     }
   }
   return 0;
+}
+
+export function parseLocalFeedExternalId(value: unknown): LocalFeedExternalId | null {
+  const text = firstString(value);
+  if (!text) {
+    return null;
+  }
+
+  const separatorIndex = text.lastIndexOf("-");
+  if (separatorIndex <= 0 || separatorIndex === text.length - 1) {
+    return null;
+  }
+
+  const productId = text.slice(0, separatorIndex);
+  const variantId = text.slice(separatorIndex + 1);
+  if (!localIdPattern.test(productId) || !localIdPattern.test(variantId)) {
+    return null;
+  }
+
+  return { productId, variantId };
 }
 
 function getNested(source: AvitoRecord, path: string) {
@@ -195,8 +228,30 @@ function attribute(source: AvitoRecord, names: string[]) {
   return null;
 }
 
+function externalId(source: AvitoRecord) {
+  const nestedItem = record(source.item);
+  return firstString(
+    source.autoload_item_id,
+    source.autoloadItemId,
+    source.autoloadId,
+    source.autoload_id,
+    source.external_id,
+    source.externalId,
+    source.xml_id,
+    source.xmlId,
+    nestedItem.autoload_item_id,
+    nestedItem.autoloadItemId,
+    nestedItem.autoloadId,
+    nestedItem.autoload_id,
+    nestedItem.external_id,
+    nestedItem.externalId,
+    nestedItem.xml_id,
+    nestedItem.xmlId
+  );
+}
+
 function parseAutoloadAttributes(source: AvitoRecord) {
-  const autoloadId = firstString(source.autoload_item_id, source.autoloadItemId, source.autoload_id);
+  const autoloadId = externalId(source);
   if (!autoloadId) {
     return {};
   }
@@ -307,7 +362,7 @@ export function buildImportedProductGroupKey(item: {
     };
   }
 
-  const autoloadId = firstString(raw.autoload_item_id, raw.autoloadItemId, raw.autoload_id);
+  const autoloadId = externalId(raw);
   if (autoloadId) {
     return {
       key: `autoload:${buildAutoloadGroupKey(autoloadId)}`,
@@ -427,6 +482,8 @@ function normalizeItem(source: AvitoRecord): NormalizedAvitoItem | null {
     ) ??
     env.DEFAULT_AVITO_CATEGORY;
   const autoloadAttributes = parseAutoloadAttributes(source);
+  const sourceExternalId = autoloadAttributes.autoloadId ?? null;
+  const localExternalId = parseLocalFeedExternalId(sourceExternalId);
   const brand = attribute(source, ["brand", "бренд"]) ?? inferBrandFromTitle(title);
   const color =
     normalizeAvitoColor(
@@ -447,6 +504,8 @@ function normalizeItem(source: AvitoRecord): NormalizedAvitoItem | null {
 
   return {
     avitoItemId: itemId,
+    sourceExternalId,
+    localExternalId,
     title,
     productTitle: group?.title ?? title,
     productGroupKey: group?.key ?? null,
@@ -468,6 +527,8 @@ function normalizeItem(source: AvitoRecord): NormalizedAvitoItem | null {
         color,
         size,
         autoloadItemId: autoloadAttributes.autoloadId,
+        localProductId: localExternalId?.productId,
+        localVariantId: localExternalId?.variantId,
         autoloadGroupKey: autoloadAttributes.groupKey,
         productGroupKey: group?.key,
         productGroupSource: group?.source
@@ -518,16 +579,71 @@ async function fetchDetail(itemId: string, accountId?: string | null) {
   }
 }
 
-async function importOne(item: NormalizedAvitoItem) {
-  const existingVariant = await prisma.variant.findUnique({
-    where: { avitoItemId: item.avitoItemId },
+function findVariantByAvitoId(avitoItemId: string) {
+  return prisma.variant.findUnique({
+    where: { avitoItemId },
     include: { product: true }
   });
+}
+
+function findVariantByLocalExternalId(localExternalId: LocalFeedExternalId | null) {
+  if (!localExternalId) {
+    return null;
+  }
+
+  return prisma.variant.findFirst({
+    where: {
+      id: localExternalId.variantId,
+      productId: localExternalId.productId
+    },
+    include: { product: true }
+  });
+}
+
+async function findExistingImportMatch(item: NormalizedAvitoItem): Promise<ExistingImportMatch> {
+  const [variantByAvitoId, variantByLocalExternalId] = await Promise.all([
+    findVariantByAvitoId(item.avitoItemId),
+    findVariantByLocalExternalId(item.localExternalId)
+  ]);
+
+  if (variantByLocalExternalId) {
+    return {
+      variant: variantByLocalExternalId,
+      duplicateVariant:
+        variantByAvitoId && variantByAvitoId.id !== variantByLocalExternalId.id
+          ? variantByAvitoId
+          : null
+    };
+  }
+
+  return { variant: variantByAvitoId, duplicateVariant: null };
+}
+
+async function deleteDuplicateImportedVariant(match: ExistingImportMatch) {
+  if (!match.duplicateVariant || !match.variant) {
+    return;
+  }
+
+  const duplicateProductId = match.duplicateVariant.productId;
+  await prisma.variant.delete({ where: { id: match.duplicateVariant.id } });
+  if (duplicateProductId !== match.variant.productId) {
+    const remainingVariants = await prisma.variant.count({ where: { productId: duplicateProductId } });
+    if (remainingVariants === 0 && duplicateProductId.startsWith("avito-")) {
+      await prisma.product.delete({ where: { id: duplicateProductId } });
+    }
+  }
+}
+
+async function importOne(item: NormalizedAvitoItem) {
+  const match = await findExistingImportMatch(item);
+  await deleteDuplicateImportedVariant(match);
+
+  const existingVariant = match.variant;
 
   const previousProductId = existingVariant?.productId;
-  const productId = item.productGroupKey
+  const productId = previousProductId ?? (item.productGroupKey
     ? stableProductId(item.productGroupKey)
-    : previousProductId ?? `avito-${item.avitoItemId}`;
+    : `avito-${item.avitoItemId}`);
   const product = await prisma.product.upsert({
     where: { id: productId },
     create: {
@@ -547,34 +663,44 @@ async function importOne(item: NormalizedAvitoItem) {
     }
   });
 
-  const variant = await prisma.variant.upsert({
-    where: { avitoItemId: item.avitoItemId },
-    create: {
-      productId: product.id,
-      title: item.title,
-      color: item.color,
-      size: item.size,
-      price: item.price,
-      quantity: item.quantity,
-      description: item.description ?? undefined,
-      status: item.status,
-      avitoItemId: item.avitoItemId,
-      lastSyncedAt: new Date(),
-      lastError: item.status === VariantStatus.ERROR ? "Imported Avito item has error/rejected status" : null
-    },
-    update: {
-      productId: product.id,
-      title: item.title,
-      color: item.color === UNKNOWN_VALUE ? undefined : item.color,
-      size: item.size === UNKNOWN_VALUE ? undefined : item.size,
-      price: item.price,
-      quantity: item.quantity,
-      description: item.description ?? undefined,
-      status: item.status,
-      lastSyncedAt: new Date(),
-      lastError: item.status === VariantStatus.ERROR ? "Imported Avito item has error/rejected status" : null
-    }
-  });
+  const lastError = item.status === VariantStatus.ERROR ? "Imported Avito item has error/rejected status" : null;
+  const lastSyncedAt = new Date();
+  const createData = {
+    productId: product.id,
+    title: item.title,
+    color: item.color,
+    size: item.size,
+    price: item.price,
+    quantity: item.quantity,
+    description: item.description ?? undefined,
+    status: item.status,
+    avitoItemId: item.avitoItemId,
+    lastSyncedAt,
+    lastError
+  };
+  const updateData = {
+    productId: product.id,
+    title: item.title,
+    color: item.color === UNKNOWN_VALUE ? undefined : item.color,
+    size: item.size === UNKNOWN_VALUE ? undefined : item.size,
+    price: item.price,
+    quantity: item.quantity,
+    description: item.description ?? undefined,
+    status: item.status,
+    avitoItemId: item.avitoItemId,
+    lastSyncedAt,
+    lastError
+  };
+  const variant = existingVariant
+    ? await prisma.variant.update({
+        where: { id: existingVariant.id },
+        data: updateData
+      })
+    : await prisma.variant.upsert({
+        where: { avitoItemId: item.avitoItemId },
+        create: createData,
+        update: updateData
+      });
 
   if (item.photos.length > 0) {
     await prisma.photo.deleteMany({

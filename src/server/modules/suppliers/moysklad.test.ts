@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeSupplierUrl,
   parseMoyskladSupplierUrl,
   resolveEffectiveSupplier,
   supplierToPrismaData,
@@ -35,6 +36,31 @@ describe("MoySklad supplier links", () => {
     expect(() => parseMoyskladSupplierUrl(validUrl.replace("https://", "http://"))).toThrow();
     expect(() => parseMoyskladSupplierUrl(validUrl.replace("b2b.moysklad.ru", "example.com"))).toThrow();
     expect(() => parseMoyskladSupplierUrl("https://b2b.moysklad.ru/public/token/catalog?productId=1")).toThrow();
+  });
+
+  it("normalizes Telegram handles and shorthand links", () => {
+    expect(normalizeSupplierUrl("@supplier_shop")).toBe("https://t.me/supplier_shop");
+    expect(normalizeSupplierUrl("t.me/supplier_shop/123")).toBe("https://t.me/supplier_shop/123");
+  });
+
+  it("stores Telegram supplier links without MoySklad IDs", () => {
+    expect(supplierToPrismaData({ supplierUrl: "https://t.me/supplier_shop/123" })).toMatchObject({
+      supplierUrl: "https://t.me/supplier_shop/123",
+      supplierName: "Telegram",
+      supplierProductId: null,
+      supplierCategoryId: null,
+      supplierCatalogToken: null
+    });
+  });
+
+  it("stores non-MoySklad supplier links as generic sources", () => {
+    expect(supplierToPrismaData({ supplierUrl: "example.com/product", supplierName: "" })).toMatchObject({
+      supplierUrl: "https://example.com/product",
+      supplierName: "Поставщик",
+      supplierProductId: null,
+      supplierCategoryId: null,
+      supplierCatalogToken: null
+    });
   });
 
   it("resolves variant override before product supplier", () => {

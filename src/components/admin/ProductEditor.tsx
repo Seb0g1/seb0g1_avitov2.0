@@ -295,11 +295,11 @@ export function ProductEditor({
           </div>
           <label>
             Название поставщика
-            <input className="field" name="supplierName" defaultValue={product.supplier?.name ?? ""} placeholder="МойСклад" />
+            <input className="field" name="supplierName" defaultValue={product.supplier?.name ?? ""} placeholder="Telegram / МойСклад / сайт" />
           </label>
           <label>
-            Ссылка поставщика МойСклад
-            <input className="field" name="supplierUrl" defaultValue={product.supplier?.url ?? ""} />
+            Ссылка поставщика
+            <input className="field" name="supplierUrl" defaultValue={product.supplier?.url ?? ""} placeholder="https://t.me/channel/123 или @username" />
           </label>
           <label>
             Описание
@@ -308,13 +308,13 @@ export function ProductEditor({
           {product.supplier ? (
             <div className="supplier-summary span-full">
               <div>
-                <strong>{product.supplier.name ?? "МойСклад"}</strong>
-                <span>productId: {product.supplier.productId}</span>
-                <span>categoryId: {product.supplier.categoryId}</span>
+                <strong>{product.supplier.name ?? "Поставщик"}</strong>
+                {product.supplier.productId ? <span>productId: {product.supplier.productId}</span> : null}
+                {product.supplier.categoryId ? <span>categoryId: {product.supplier.categoryId}</span> : null}
               </div>
               <a className="button" href={product.supplier.url ?? "#"} target="_blank" rel="noreferrer">
                 <ExternalLink size={18} aria-hidden />
-                Открыть в МойСклад
+                Открыть поставщика
               </a>
             </div>
           ) : null}
@@ -488,7 +488,7 @@ function VariantEditor({
             className="field"
             name="supplierUrl"
             defaultValue={variant.supplier?.url ?? ""}
-            placeholder={variant.effectiveSupplier ? "Наследуется от товара" : "https://b2b.moysklad.ru/public/..."}
+            placeholder={variant.effectiveSupplier ? "Наследуется от товара" : "https://t.me/channel/123 или @username"}
           />
         </label>
         <div className="span-full supplier-summary">
@@ -502,8 +502,9 @@ function VariantEditor({
             </strong>
             {variant.effectiveSupplier ? (
               <>
-                <span>productId: {variant.effectiveSupplier.productId}</span>
-                <span>categoryId: {variant.effectiveSupplier.categoryId}</span>
+                {variant.effectiveSupplier.name ? <span>{variant.effectiveSupplier.name}</span> : null}
+                {variant.effectiveSupplier.productId ? <span>productId: {variant.effectiveSupplier.productId}</span> : null}
+                {variant.effectiveSupplier.categoryId ? <span>categoryId: {variant.effectiveSupplier.categoryId}</span> : null}
               </>
             ) : null}
           </div>

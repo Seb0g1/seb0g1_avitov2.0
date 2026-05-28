@@ -17,18 +17,77 @@ export type SupplierOwner = {
 };
 
 const moyskladHost = "b2b.moysklad.ru";
+const telegramHosts = new Set(["t.me", "telegram.me", "telegram.dog"]);
+const safeSupplierProtocols = new Set(["http:", "https:", "tg:"]);
+const supplierUrlError =
+  "Вставьте ссылку поставщика: Telegram, сайт или публичную ссылку МойСклад B2B.";
 
-export function parseMoyskladSupplierUrl(value: unknown) {
-  if (value == null || String(value).trim() === "") {
+function isMoyskladUrl(url: URL) {
+  return url.protocol === "https:" && url.hostname === moyskladHost;
+}
+
+function isTelegramUrl(url: URL) {
+  return url.protocol === "tg:" || telegramHosts.has(url.hostname.toLowerCase());
+}
+
+function withSupplierProtocol(value: string) {
+  if (value.startsWith("@")) {
+    return `https://t.me/${value.slice(1)}`;
+  }
+  if (/^(https?:|tg:)/i.test(value)) {
+    return value;
+  }
+  if (/^(t\.me|telegram\.me|telegram\.dog)\//i.test(value)) {
+    return `https://${value}`;
+  }
+  if (/^[a-z0-9.-]+\.[a-z]{2,}([/:?#]|$)/i.test(value)) {
+    return `https://${value}`;
+  }
+  return value;
+}
+
+export function normalizeSupplierUrl(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text) {
     return null;
   }
 
   let url: URL;
   try {
-    url = new URL(String(value).trim());
+    url = new URL(withSupplierProtocol(text));
   } catch {
-    throw new Error("Вставьте публичную ссылку МойСклад B2B с productId и categoryId.");
+    throw new Error(supplierUrlError);
   }
+
+  if (!safeSupplierProtocols.has(url.protocol)) {
+    throw new Error(supplierUrlError);
+  }
+
+  return url.toString();
+}
+
+function inferredSupplierName(url: string, name: string | null) {
+  if (name) {
+    return name;
+  }
+
+  const parsed = new URL(url);
+  if (isMoyskladUrl(parsed)) {
+    return "МойСклад";
+  }
+  if (isTelegramUrl(parsed)) {
+    return "Telegram";
+  }
+  return "Поставщик";
+}
+
+export function parseMoyskladSupplierUrl(value: unknown) {
+  const normalizedUrl = normalizeSupplierUrl(value);
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  const url = new URL(normalizedUrl);
 
   const [, publicSegment, catalogToken, catalogSegment] = url.pathname.split("/");
   const productId = url.searchParams.get("productId")?.trim() ?? "";
@@ -47,7 +106,7 @@ export function parseMoyskladSupplierUrl(value: unknown) {
   }
 
   return {
-    url: url.toString(),
+    url: normalizedUrl,
     productId,
     categoryId,
     catalogToken
@@ -71,9 +130,9 @@ export function supplierToPrismaData(input: {
     return { supplierName: name };
   }
 
-  const parsed = parseMoyskladSupplierUrl(input.supplierUrl);
+  const normalizedUrl = normalizeSupplierUrl(input.supplierUrl);
 
-  if (!parsed) {
+  if (!normalizedUrl) {
     return {
       supplierUrl: null,
       supplierName: name,
@@ -84,9 +143,28 @@ export function supplierToPrismaData(input: {
     };
   }
 
+  const supplierName = inferredSupplierName(normalizedUrl, name);
+  const parsedUrl = new URL(normalizedUrl);
+
+  if (!isMoyskladUrl(parsedUrl)) {
+    return {
+      supplierUrl: normalizedUrl,
+      supplierName,
+      supplierProductId: null,
+      supplierCategoryId: null,
+      supplierCatalogToken: null,
+      supplierUpdatedAt: new Date()
+    };
+  }
+
+  const parsed = parseMoyskladSupplierUrl(normalizedUrl);
+  if (!parsed) {
+    throw new Error(supplierUrlError);
+  }
+
   return {
     supplierUrl: parsed.url,
-    supplierName: name,
+    supplierName,
     supplierProductId: parsed.productId,
     supplierCategoryId: parsed.categoryId,
     supplierCatalogToken: parsed.catalogToken,

@@ -59,6 +59,20 @@ function emptyColorGroup(color = ""): ColorGroupDraft {
   };
 }
 
+function inferSupplierName(url: string) {
+  const text = url.trim().toLowerCase();
+  if (!text) {
+    return null;
+  }
+  if (text.startsWith("@") || text.startsWith("tg:") || text.includes("t.me/") || text.includes("telegram.me/")) {
+    return "Telegram";
+  }
+  if (text.includes("b2b.moysklad.ru")) {
+    return "МойСклад";
+  }
+  return "Поставщик";
+}
+
 function uniqueFilled(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
@@ -150,6 +164,7 @@ export function ProductCreationWizard({
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [supplierUrl, setSupplierUrl] = useState("");
+  const [supplierName, setSupplierName] = useState("");
   const [colorGroups, setColorGroups] = useState<ColorGroupDraft[]>([emptyColorGroup("Белый")]);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -336,7 +351,7 @@ export function ProductCreationWizard({
         price,
         quantity,
         supplierUrl,
-        supplierName: supplierUrl.trim() ? "МойСклад" : null,
+        supplierName: supplierUrl.trim() ? supplierName.trim() || inferSupplierName(supplierUrl) : null,
         colorGroups: normalizedGroups
       })
     });
@@ -456,15 +471,24 @@ export function ProductCreationWizard({
                 </select>
               </label>
               <label className="span-full">
-                Ссылка поставщика МойСклад
+                Ссылка поставщика
                 <div className="field-with-icon">
                   <LinkIcon size={18} aria-hidden />
                   <input
                     value={supplierUrl}
                     onChange={(event) => setSupplierUrl(event.target.value)}
-                    placeholder="https://b2b.moysklad.ru/public/.../catalog?categoryId=...&productId=..."
+                    placeholder="https://t.me/channel/123, @username или ссылка МойСклад"
                   />
                 </div>
+              </label>
+              <label className="span-full">
+                Название поставщика
+                <input
+                  className="field"
+                  value={supplierName}
+                  onChange={(event) => setSupplierName(event.target.value)}
+                  placeholder="Заполнится автоматически по ссылке, если оставить пустым"
+                />
               </label>
             </div>
           </section>
