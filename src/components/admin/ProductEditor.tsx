@@ -3,7 +3,7 @@
 import { DragEvent, FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { VariantStatus } from "@prisma/client";
-import { Copy, ExternalLink, Film, Save, Sparkles, Trash2, Upload } from "lucide-react";
+import { CheckSquare, Copy, ExternalLink, Film, Save, Sparkles, Trash2, Upload } from "lucide-react";
 import {
   clothingMaterialOptions,
   clothingCategoryOptions,
@@ -215,6 +215,38 @@ export function ProductEditor({
   async function duplicateVariant(variantId: string) {
     const response = await fetch(`/api/variants/${variantId}/duplicate`, { method: "POST" });
     setMessage(response.ok ? "Вариант продублирован." : "Не удалось продублировать вариант.");
+    router.refresh();
+  }
+
+  async function expandVariantSizes(variantId: string, sizes: string[]) {
+    if (sizes.length === 0) {
+      setMessage("Выберите размеры для мультиобъявления.");
+      return;
+    }
+
+    const response = await fetch(`/api/variants/${variantId}/sizes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sizes })
+    });
+    const body = (await response.json().catch(() => null)) as {
+      updatedVariants?: number;
+      createdVariants?: number;
+      skippedExisting?: string[];
+      message?: string;
+    } | null;
+
+    if (!response.ok) {
+      setMessage(body?.message ?? "Не удалось создать варианты по размерам.");
+      return;
+    }
+
+    const skipped = body?.skippedExisting?.length
+      ? ` Уже были: ${body.skippedExisting.join(", ")}.`
+      : "";
+    setMessage(
+      `Размеры сохранены: обновлено ${body?.updatedVariants ?? 0}, создано вариантов ${body?.createdVariants ?? 0}.${skipped}`
+    );
     router.refresh();
   }
 
@@ -474,6 +506,7 @@ export function ProductEditor({
               variant={variant}
               onSubmit={updateVariant}
               onDuplicate={duplicateVariant}
+              onExpandSizes={expandVariantSizes}
               onRemove={removeVariant}
               onUpload={uploadPhotos}
               onUploadVideo={uploadVideos}
@@ -493,6 +526,7 @@ function VariantEditor({
   variant,
   onSubmit,
   onDuplicate,
+  onExpandSizes,
   onRemove,
   onUpload,
   onUploadVideo,
@@ -504,6 +538,7 @@ function VariantEditor({
   variant: VariantDto;
   onSubmit: (event: FormEvent<HTMLFormElement>, variantId: string) => void;
   onDuplicate: (variantId: string) => void;
+  onExpandSizes: (variantId: string, sizes: string[]) => void;
   onRemove: (variantId: string) => void;
   onUpload: (variantId: string, files: FileList | File[]) => void;
   onUploadVideo: (variantId: string, files: FileList | File[]) => void;
@@ -514,6 +549,21 @@ function VariantEditor({
 }) {
   const [editingColor, setEditingColor] = useState(variant.color);
   const [editingSize, setEditingSize] = useState(variant.size);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(
+    variant.size && variant.size !== "Не указан" ? [variant.size] : []
+  );
+
+  function toggleSelectedSize(size: string) {
+    setSelectedSizes((current) => {
+      if (current.includes(size)) {
+        return current.filter((value) => value !== size);
+      }
+      if (editingSize === "Не указан" || !editingSize) {
+        setEditingSize(size);
+      }
+      return [...current, size];
+    });
+  }
 
   function drop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
@@ -562,10 +612,43 @@ function VariantEditor({
                 : [{ value: editingSize, label: editingSize }, ...sizeOptions]
             }
             placeholder="Поиск размера"
-            onChange={setEditingSize}
+            onChange={(value) => {
+              setEditingSize(value);
+              setSelectedSizes((current) => (current.includes(value) ? current : [...current, value]));
+            }}
             required
           />
         </label>
+        <div className="span-full">
+          <div className="field-caption">Размеры в наличии</div>
+          <div className="size-picker" aria-label={`Размеры для ${variant.title}`}>
+            {sizeOptions.map((size) => (
+              <label className="size-chip" key={size.value}>
+                <input
+                  type="checkbox"
+                  checked={selectedSizes.includes(size.value)}
+                  onChange={() => toggleSelectedSize(size.value)}
+                />
+                <span>{size.value}</span>
+              </label>
+            ))}
+          </div>
+          <div className="toolbar" style={{ marginTop: 10 }}>
+            <button
+              className="button"
+              type="button"
+              onClick={() => onExpandSizes(variant.id, selectedSizes)}
+              disabled={selectedSizes.length === 0}
+              title="Создать отдельные варианты с теми же фото и видео"
+            >
+              <CheckSquare size={18} aria-hidden />
+              Создать варианты по размерам
+            </button>
+            <span className="muted">
+              Выбрано: {selectedSizes.length ? selectedSizes.join(", ") : "—"}
+            </span>
+          </div>
+        </div>
         <label>
           Цена
           <input className="field" name="price" type="number" min="0" step="0.01" defaultValue={variant.price} />

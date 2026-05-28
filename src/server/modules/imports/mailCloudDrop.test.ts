@@ -64,6 +64,17 @@ describe("Mail Cloud drop import parsing", () => {
     expect(info.warnings).toEqual(["Неверная цена: дорого"]);
   });
 
+  it("finds Telegram links without the exact Russian key", () => {
+    expect(parseDropInfo("TG: t.me/RollyOpt/4158\nЦена: 5499\n")).toMatchObject({
+      supplierUrl: "t.me/RollyOpt/4158",
+      price: 5499
+    });
+    expect(parseDropInfo("https://t.me/RollyOpt/4158\nСтоимость: 5499\n")).toMatchObject({
+      supplierUrl: "https://t.me/RollyOpt/4158",
+      price: 5499
+    });
+  });
+
   it("parses WebDAV directory responses", () => {
     const xml = `<?xml version="1.0"?>
       <d:multistatus xmlns:d="DAV:">

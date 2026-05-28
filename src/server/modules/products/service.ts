@@ -25,6 +25,7 @@ import {
   createProductSchema,
   createProductWithVariantsSchema,
   createVariantSchema,
+  expandVariantSizesSchema,
   productListQuerySchema,
   updateProductSchema,
   updateVariantSchema
@@ -56,6 +57,10 @@ function looksDamagedText(value: string) {
 function usableBaseCategory(value: string) {
   const text = value.trim();
   return text.length > 0 && !looksDamagedText(text);
+}
+
+function variantTitleForSize(productTitle: string, color: string, size: string) {
+  return `${productTitle} ${color} ${size}`.replace(/\s+/g, " ").trim();
 }
 
 function categoryFields(value: unknown) {
@@ -527,6 +532,138 @@ export async function duplicateVariant(id: string) {
   });
 
   return duplicated;
+}
+
+export async function expandVariantSizes(id: string, input: unknown) {
+  const data = expandVariantSizesSchema.parse(input);
+  const requestedSizes = uniqueValues(data.sizes);
+  const source = await prisma.variant.findUniqueOrThrow({
+    where: { id },
+    include: {
+      product: { include: { variants: true } },
+      photos: { orderBy: { sortOrder: "asc" } },
+      videos: { orderBy: { sortOrder: "asc" } }
+    }
+  });
+
+  const attributes = asRecord(source.product.avitoAttributes);
+  const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
+  const currentSizes = source.product.variants
+    .filter((variant) => variant.color === source.color && variant.size !== "Не указан")
+    .map((variant) => variant.size);
+  const allSizes = uniqueValues([...currentSizes, ...requestedSizes]);
+  const allColors = uniqueValues(source.product.variants.map((variant) => variant.color));
+  const existingBySize = new Map(
+    source.product.variants
+      .filter((variant) => variant.color === source.color)
+      .map((variant) => [variant.size, variant])
+  );
+  const sourceNeedsSize = source.size === "Не указан" || !requestedSizes.includes(source.size);
+  const sourceSize = sourceNeedsSize
+    ? requestedSizes.find((size) => !existingBySize.has(size)) ?? requestedSizes[0]
+    : source.size;
+  const sourceArticle = buildVariantArticle(source.product.title, source.color, sourceSize);
+  let updatedVariants = 0;
+
+  if (sourceNeedsSize || source.title !== variantTitleForSize(source.product.title, source.color, sourceSize)) {
+    await prisma.variant.update({
+      where: { id: source.id },
+      data: {
+        size: sourceSize,
+        title: variantTitleForSize(source.product.title, source.color, sourceSize),
+        description: buildVariantDescription({
+          title: source.product.title,
+          materials,
+          color: source.color,
+          size: sourceSize,
+          article: sourceArticle,
+          colors: allColors,
+          sizes: allSizes
+        })
+      }
+    });
+    existingBySize.delete(source.size);
+    existingBySize.set(sourceSize, source);
+    updatedVariants += 1;
+  }
+
+  const createdVariants = [];
+  const skippedExisting: string[] = [];
+  for (const size of requestedSizes) {
+    if (size === sourceSize) {
+      continue;
+    }
+    if (existingBySize.has(size)) {
+      skippedExisting.push(size);
+      continue;
+    }
+
+    const article = buildVariantArticle(source.product.title, source.color, size);
+    const created = await prisma.variant.create({
+      data: {
+        productId: source.productId,
+        title: variantTitleForSize(source.product.title, source.color, size),
+        color: source.color,
+        size,
+        price: source.price,
+        quantity: source.quantity,
+        description: buildVariantDescription({
+          title: source.product.title,
+          materials,
+          color: source.color,
+          size,
+          article,
+          colors: allColors,
+          sizes: allSizes
+        }),
+        status: source.status,
+        supplierUrl: source.supplierUrl,
+        supplierName: source.supplierName,
+        supplierProductId: source.supplierProductId,
+        supplierCategoryId: source.supplierCategoryId,
+        supplierCatalogToken: source.supplierCatalogToken,
+        supplierUpdatedAt: source.supplierUpdatedAt,
+        photos: {
+          create: source.photos.map((photo) => ({
+            path: photo.path,
+            publicUrl: photo.publicUrl,
+            sortOrder: photo.sortOrder
+          }))
+        },
+        videos: {
+          create: source.videos.map((video) => ({
+            path: video.path,
+            publicUrl: video.publicUrl,
+            sortOrder: video.sortOrder
+          }))
+        }
+      },
+      select: { id: true, size: true }
+    });
+    existingBySize.set(size, source);
+    createdVariants.push(created);
+  }
+
+  await prisma.actionLog.create({
+    data: {
+      message: "Variant sizes expanded",
+      context: {
+        sourceVariantId: id,
+        productId: source.productId,
+        color: source.color,
+        sizes: requestedSizes,
+        updatedVariants,
+        createdVariants: createdVariants.length,
+        skippedExisting
+      }
+    }
+  });
+
+  return {
+    updatedVariants,
+    createdVariants: createdVariants.length,
+    skippedExisting
+  };
 }
 
 export async function bulkUpdateVariantStatus(input: unknown) {

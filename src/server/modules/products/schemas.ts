@@ -95,3 +95,7 @@ export const bulkStatusSchema = z.object({
   variantIds: z.array(z.string()).min(1),
   status: z.nativeEnum(VariantStatus)
 });
+
+export const expandVariantSizesSchema = z.object({
+  sizes: z.array(z.enum(clothingSizeValues as [string, ...string[]])).min(1)
+});

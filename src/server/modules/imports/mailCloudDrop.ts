@@ -59,6 +59,15 @@ export type MailCloudDropImportResult = {
   warnings: string[];
 };
 
+export type MailCloudSupplierBackfillResult = {
+  scannedProducts: number;
+  updatedProducts: number;
+  updatedVariants: number;
+  skippedMissingProducts: number;
+  skippedWithoutSupplierUrl: number;
+  warnings: string[];
+};
+
 const infoFileName = "инфа.txt";
 const unknownValue = "Не указан";
 const supportedImageExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
@@ -173,6 +182,18 @@ function isVideoEntry(entry: MailCloudEntry) {
 
 function isInfoEntry(entry: MailCloudEntry) {
   return !entry.isDirectory && entry.name.toLowerCase() === infoFileName;
+}
+
+function supplierUrlFromText(value: string) {
+  const match = value.match(/https?:\/\/(?:t\.me|telegram\.me|telegram\.dog)\/[^\s"'<>]+|(?:t\.me|telegram\.me|telegram\.dog)\/[^\s"'<>]+|@[a-z0-9_]{4,}/i);
+  return match?.[0]?.replace(/[),.;]+$/, "") ?? null;
+}
+
+function normalizedInfoKey(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
 }
 
 function sortedImages(entries: MailCloudEntry[]) {
@@ -292,27 +313,32 @@ export function parseDropInfo(text: string): DropInfo {
       continue;
     }
 
+    const inlineSupplierUrl = supplierUrlFromText(line);
+    if (inlineSupplierUrl && !result.supplierUrl) {
+      result.supplierUrl = inlineSupplierUrl;
+    }
+
     const separator = line.indexOf(":");
     if (separator === -1) {
       continue;
     }
 
-    const key = line.slice(0, separator).trim().toLowerCase();
+    const key = normalizedInfoKey(line.slice(0, separator));
     const value = line.slice(separator + 1).trim();
     if (!value) {
       continue;
     }
 
-    if (key === "ссылка") {
-      result.supplierUrl = value;
-    } else if (key === "цена") {
+    if (["ссылка", "link", "url", "telegram", "телеграм", "тг", "tg", "поставщик"].includes(key)) {
+      result.supplierUrl = supplierUrlFromText(value) ?? value;
+    } else if (["цена", "стоимость", "price"].includes(key)) {
       const parsed = Number(value.replace(/\s+/g, "").replace(",", ".").replace(/[^\d.]/g, ""));
       if (Number.isFinite(parsed) && parsed > 0) {
         result.price = parsed;
       } else {
         result.warnings.push(`Неверная цена: ${value}`);
       }
-    } else if (key === "цвет") {
+    } else if (["цвет", "color"].includes(key)) {
       result.color = normalizeAvitoColor(value) || value;
     }
   }
@@ -615,6 +641,86 @@ export async function importMailCloudDrop(date: string, client = createMailCloud
   await prisma.actionLog.create({
     data: {
       message: "Mail Cloud drop imported",
+      context: result as unknown as Prisma.InputJsonValue
+    }
+  });
+
+  return result;
+}
+
+function firstSupplierUrl(draft: DropProductDraft) {
+  return draft.info.supplierUrl ?? draft.variants.find((variant) => variant.supplierUrl)?.supplierUrl ?? null;
+}
+
+export async function backfillMailCloudSupplierLinks(
+  date: string,
+  client = createMailCloudClient()
+): Promise<MailCloudSupplierBackfillResult> {
+  const collected = await collectMailCloudDropProducts({ client, date });
+  const result: MailCloudSupplierBackfillResult = {
+    scannedProducts: collected.products.length,
+    updatedProducts: 0,
+    updatedVariants: 0,
+    skippedMissingProducts: 0,
+    skippedWithoutSupplierUrl: 0,
+    warnings: [...collected.warnings]
+  };
+
+  for (const draft of collected.products) {
+    const product = await prisma.product.findFirst({
+      where: {
+        avitoAttributes: {
+          path: ["mailCloud", "productPath"],
+          equals: draft.productPath
+        }
+      },
+      include: { variants: { select: { id: true, color: true, supplierUrl: true } } }
+    });
+    if (!product) {
+      result.skippedMissingProducts += 1;
+      continue;
+    }
+
+    const productSupplierUrl = firstSupplierUrl(draft);
+    if (!productSupplierUrl) {
+      result.skippedWithoutSupplierUrl += 1;
+      continue;
+    }
+
+    if (!product.supplierUrl) {
+      await prisma.product.update({
+        where: { id: product.id },
+        data: supplierToPrismaData({
+          supplierUrl: productSupplierUrl,
+          supplierName: "Telegram"
+        })
+      });
+      result.updatedProducts += 1;
+    }
+
+    for (const variantDraft of draft.variants) {
+      const supplierUrl = variantDraft.supplierUrl ?? productSupplierUrl;
+      const variants = product.variants.filter(
+        (variant) => variant.color === variantDraft.color && !variant.supplierUrl
+      );
+      if (variants.length === 0) {
+        continue;
+      }
+
+      await prisma.variant.updateMany({
+        where: { id: { in: variants.map((variant) => variant.id) } },
+        data: supplierToPrismaData({
+          supplierUrl,
+          supplierName: "Telegram"
+        })
+      });
+      result.updatedVariants += variants.length;
+    }
+  }
+
+  await prisma.actionLog.create({
+    data: {
+      message: "Mail Cloud supplier links backfilled",
       context: result as unknown as Prisma.InputJsonValue
     }
   });
