@@ -60,11 +60,8 @@ async function jsonRequest(url: string, method: string, body: unknown) {
 
 function variantBody(formData: FormData) {
   return {
-    title: formData.get("title"),
     color: formData.get("color"),
     size: formData.get("size"),
-    price: formData.get("price"),
-    quantity: formData.get("quantity"),
     description: formData.get("description"),
     supplierUrl: formData.get("supplierUrl"),
     supplierName: formData.get("supplierName"),
@@ -132,6 +129,11 @@ export function ProductEditor({
     description: size.label === size.value ? undefined : size.label
   }));
   const multiItemName = String(attributes.multiItemName ?? product.title);
+  const firstVariant = product.variants[0];
+  const [commonVariantPrice, setCommonVariantPrice] = useState(firstVariant?.price ?? "");
+  const [commonVariantQuantity, setCommonVariantQuantity] = useState(
+    String(firstVariant?.quantity ?? 1)
+  );
 
   function toggleProductMaterial(material: string) {
     if (selectedMaterials.includes(material)) {
@@ -182,6 +184,8 @@ export function ProductEditor({
         baseDescription: formData.get("baseDescription"),
         supplierUrl: formData.get("supplierUrl"),
         supplierName: formData.get("supplierName"),
+        variantPrice: formData.get("variantPrice"),
+        variantQuantity: formData.get("variantQuantity"),
         avitoAttributes: {
           material: formatMaterialsForCategory(selectedMaterials, null, nextClothingCategory),
           materials: normalizedMaterials,
@@ -211,7 +215,11 @@ export function ProductEditor({
     const form = event.currentTarget;
     const formData = new FormData(form);
     try {
-      await jsonRequest(`/api/products/${product.id}/variants`, "POST", variantBody(formData));
+      await jsonRequest(`/api/products/${product.id}/variants`, "POST", {
+        ...variantBody(formData),
+        price: commonVariantPrice || firstVariant?.price || "0",
+        quantity: commonVariantQuantity || String(firstVariant?.quantity ?? 1)
+      });
       form.reset();
       setNewVariantColor("Чёрный");
       setNewVariantSize(defaultSizeForCategory(editingCategoryOption));
@@ -343,6 +351,31 @@ export function ProductEditor({
                 <option key={option} value={option} />
               ))}
             </datalist>
+          </label>
+          <label>
+            Цена для всех вариантов
+            <input
+              className="field"
+              name="variantPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              value={commonVariantPrice}
+              onChange={(event) => setCommonVariantPrice(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Остаток для всех вариантов
+            <input
+              className="field"
+              name="variantQuantity"
+              type="number"
+              min="0"
+              value={commonVariantQuantity}
+              onChange={(event) => setCommonVariantQuantity(event.target.value)}
+              required
+            />
           </label>
           <label>
             Категория Avito
@@ -479,10 +512,6 @@ export function ProductEditor({
 
         <form className="form-grid three" onSubmit={createVariant}>
           <label>
-            Название
-            <input className="field" name="title" placeholder={`${product.title} Чёрный 48 (M)`} required />
-          </label>
-          <label>
             Цвет
             <SearchableSelect
               name="color"
@@ -503,14 +532,6 @@ export function ProductEditor({
               onChange={setNewVariantSize}
               required
             />
-          </label>
-          <label>
-            Цена
-            <input className="field" name="price" type="number" min="0" step="0.01" required />
-          </label>
-          <label>
-            Количество
-            <input className="field" name="quantity" type="number" min="0" defaultValue="1" required />
           </label>
           <label>
             Статус
@@ -634,10 +655,6 @@ function VariantEditor({
     <div className="variant-row">
       <form className="form-grid three" onSubmit={(event) => onSubmit(event, variant.id)}>
         <label>
-          Название
-          <input className="field" name="title" defaultValue={variant.title} required />
-        </label>
-        <label>
           Цвет
           <SearchableSelect
             name="color"
@@ -700,14 +717,6 @@ function VariantEditor({
             </span>
           </div>
         </div>
-        <label>
-          Цена
-          <input className="field" name="price" type="number" min="0" step="0.01" defaultValue={variant.price} />
-        </label>
-        <label>
-          Количество
-          <input className="field" name="quantity" type="number" min="0" defaultValue={variant.quantity} />
-        </label>
         <label>
           Статус
           <select className="select" name="status" defaultValue={variant.status}>

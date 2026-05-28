@@ -458,7 +458,7 @@ async function collectProductDraft(
       }
       warnings.push(...info.warnings.map((warning) => `${colorFolder.path}: ${warning}`));
       variants.push({
-        title: `${input.product.name} (${color})`,
+        title: input.product.name,
         color,
         price: info.price ?? 0,
         supplierUrl: info.supplierUrl,
@@ -479,7 +479,7 @@ async function collectProductDraft(
       warnings.push(`Нет фото: ${input.product.path}`);
     }
     variants.push({
-      title: color === unknownValue ? input.product.name : `${input.product.name} (${color})`,
+      title: input.product.name,
       color,
       price: productInfo.price ?? 0,
       supplierUrl: productInfo.supplierUrl,
@@ -716,7 +716,7 @@ async function createImportedProduct(draft: DropProductDraft, client: MailCloudC
     const variant = await prisma.variant.create({
       data: {
         productId: product.id,
-        title: variantDraft.title,
+        title: draft.title,
         color: variantDraft.color,
         size: unknownValue,
         price: String(variantDraft.price),

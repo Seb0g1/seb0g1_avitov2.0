@@ -501,7 +501,7 @@ async function upsertImportRow(row: ParsedAvitoXlsxRow) {
 
   const variantData = {
     productId: product.id,
-    title: row.title,
+    title: productTitle,
     color: row.color,
     size: row.normalizedSize ?? row.size,
     price: row.price,

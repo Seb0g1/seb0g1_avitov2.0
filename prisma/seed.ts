@@ -37,9 +37,9 @@ async function main() {
   });
 
   const variants = [
-    { title: "Nike Stussy Black M", color: "Black", size: "M", price: "12990.00" },
-    { title: "Nike Stussy Black L", color: "Black", size: "L", price: "12990.00" },
-    { title: "Nike Stussy Grey M", color: "Grey", size: "M", price: "11990.00" }
+    { title: product.title, color: "Black", size: "M", price: "12990.00" },
+    { title: product.title, color: "Black", size: "L", price: "12990.00" },
+    { title: product.title, color: "Grey", size: "M", price: "12990.00" }
   ];
 
   for (const variant of variants) {

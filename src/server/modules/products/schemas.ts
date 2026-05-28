@@ -3,6 +3,14 @@ import { z } from "zod";
 import { avitoMaterialValues, avitoSizeValues, maxClothingMaterials } from "@/lib/avitoOptions";
 
 const decimalInput = z.union([z.string(), z.number()]).transform((value) => String(value));
+const optionalDecimalInput = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  decimalInput.optional()
+);
+const optionalIntegerInput = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.coerce.number().int().min(0).optional()
+);
 const materialValues = [...avitoMaterialValues] as [string, ...string[]];
 const booleanFilter = z.preprocess(
   (value) => value === true || value === "true" || value === "1",
@@ -23,7 +31,10 @@ export const createProductSchema = z.object({
   avitoAttributes: z.record(z.unknown()).optional().nullable()
 });
 
-export const updateProductSchema = createProductSchema.partial();
+export const updateProductSchema = createProductSchema.partial().extend({
+  variantPrice: optionalDecimalInput,
+  variantQuantity: optionalIntegerInput
+});
 
 export const productListQuerySchema = z.object({
   search: z.string().optional(),
@@ -38,7 +49,7 @@ export const productListQuerySchema = z.object({
 });
 
 export const createVariantSchema = z.object({
-  title: z.string().min(2),
+  title: z.string().min(2).optional(),
   color: z.string().min(1),
   size: z.string().min(1),
   price: decimalInput,

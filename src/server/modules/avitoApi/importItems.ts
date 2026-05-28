@@ -667,7 +667,7 @@ async function importOne(item: NormalizedAvitoItem) {
   const lastSyncedAt = new Date();
   const createData = {
     productId: product.id,
-    title: item.title,
+    title: product.title,
     color: item.color,
     size: item.size,
     price: item.price,
@@ -680,7 +680,7 @@ async function importOne(item: NormalizedAvitoItem) {
   };
   const updateData = {
     productId: product.id,
-    title: item.title,
+    title: product.title,
     color: item.color === UNKNOWN_VALUE ? undefined : item.color,
     size: item.size === UNKNOWN_VALUE ? undefined : item.size,
     price: item.price,

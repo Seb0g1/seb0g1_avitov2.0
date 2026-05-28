@@ -45,6 +45,20 @@ function stringArray(value: unknown) {
     : [];
 }
 
+function omitVariantTitle<T extends { title?: unknown }>(value: T) {
+  const next = { ...value };
+  delete next.title;
+  return next as Omit<T, "title">;
+}
+
+function omitVariantSharedFields<T extends { title?: unknown; price?: unknown; quantity?: unknown }>(value: T) {
+  const next = { ...value };
+  delete next.title;
+  delete next.price;
+  delete next.quantity;
+  return next as Omit<T, "title" | "price" | "quantity">;
+}
+
 function looksDamagedText(value: string) {
   const text = value.trim();
   if (text.includes("\uFFFD")) {
@@ -59,10 +73,6 @@ function looksDamagedText(value: string) {
 function usableBaseCategory(value: string) {
   const text = value.trim();
   return text.length > 0 && !looksDamagedText(text);
-}
-
-function variantTitleForSize(productTitle: string, color: string, size: string) {
-  return `${productTitle} ${color} ${size}`.replace(/\s+/g, " ").trim();
 }
 
 function categoryFields(value: unknown) {
@@ -278,10 +288,9 @@ export async function createProductWithVariants(input: unknown) {
     colorGroups.length > 0
       ? colorGroups.flatMap((group) =>
           group.sizes.map((size) => {
-            const title = `${data.title} (${group.color})`;
             const article = buildVariantArticle(data.title, group.color, size);
             return {
-              title,
+              title: data.title,
               color: group.color,
               size,
               price: data.price ?? "0",
@@ -300,9 +309,11 @@ export async function createProductWithVariants(input: unknown) {
           })
         )
       : (data.variants ?? []).map((variant) => {
-          const { supplierUrl, supplierName, ...variantData } = variant;
+          const { supplierUrl, supplierName, ...variantWithTitle } = variant;
+          const variantData = omitVariantTitle(variantWithTitle);
           return {
             ...variantData,
+            title: data.title,
             ...supplierToPrismaData({ supplierUrl, supplierName }),
             status: variant.status ?? VariantStatus.DRAFT
           };
@@ -347,7 +358,14 @@ export async function createProductWithVariants(input: unknown) {
 
 export async function updateProduct(id: string, input: unknown) {
   const data = updateProductSchema.parse(input);
-  const { avitoAttributes, supplierUrl, supplierName, ...productData } = data;
+  const {
+    avitoAttributes,
+    supplierUrl,
+    supplierName,
+    variantPrice,
+    variantQuantity,
+    ...productData
+  } = data;
   const normalizedProductData = {
     ...productData,
     ...(productData.baseCategory !== undefined
@@ -372,6 +390,19 @@ export async function updateProduct(id: string, input: unknown) {
       ...supplierData,
       avitoAttributes: mergedAttributes
     }
+  });
+  const variantSyncData: Prisma.VariantUpdateManyMutationInput = {
+    title: product.title
+  };
+  if (variantPrice !== undefined) {
+    variantSyncData.price = variantPrice;
+  }
+  if (variantQuantity !== undefined) {
+    variantSyncData.quantity = variantQuantity;
+  }
+  await prisma.variant.updateMany({
+    where: { productId: id },
+    data: variantSyncData
   });
   await prisma.actionLog.create({
     data: { message: "Product updated", context: { productId: product.id } }
@@ -495,9 +526,19 @@ export async function deleteProduct(id: string, options?: { unpublishFromAvito?:
 
 export async function createVariant(productId: string, input: unknown) {
   const data = createVariantSchema.parse(input);
-  const { supplierUrl, supplierName, ...variantData } = data;
+  const product = await prisma.product.findUniqueOrThrow({
+    where: { id: productId },
+    select: { title: true }
+  });
+  const { supplierUrl, supplierName, ...variantWithTitle } = data;
+  const variantData = omitVariantTitle(variantWithTitle);
   const variant = await prisma.variant.create({
-    data: { ...variantData, ...supplierToPrismaData({ supplierUrl, supplierName }), productId },
+    data: {
+      ...variantData,
+      title: product.title,
+      ...supplierToPrismaData({ supplierUrl, supplierName }),
+      productId
+    },
     include: { photos: true, videos: true }
   });
   await prisma.actionLog.create({
@@ -508,11 +549,16 @@ export async function createVariant(productId: string, input: unknown) {
 
 export async function updateVariant(id: string, input: unknown) {
   const data = updateVariantSchema.parse(input);
-  const { supplierUrl, supplierName, ...variantData } = data;
+  const current = await prisma.variant.findUniqueOrThrow({
+    where: { id },
+    select: { product: { select: { title: true } } }
+  });
+  const { supplierUrl, supplierName, ...variantWithSharedFields } = data;
+  const variantData = omitVariantSharedFields(variantWithSharedFields);
   const supplierData = supplierToPrismaData({ supplierUrl, supplierName });
   const variant = await prisma.variant.update({
     where: { id },
-    data: { ...variantData, ...supplierData },
+    data: { ...variantData, title: current.product.title, ...supplierData },
     include: { photos: { orderBy: { sortOrder: "asc" } }, videos: { orderBy: { sortOrder: "asc" } } }
   });
   await prisma.actionLog.create({
@@ -536,13 +582,17 @@ export async function deleteVariant(id: string) {
 export async function duplicateVariant(id: string) {
   const variant = await prisma.variant.findUniqueOrThrow({
     where: { id },
-    include: { photos: { orderBy: { sortOrder: "asc" } }, videos: { orderBy: { sortOrder: "asc" } } }
+    include: {
+      product: { select: { title: true } },
+      photos: { orderBy: { sortOrder: "asc" } },
+      videos: { orderBy: { sortOrder: "asc" } }
+    }
   });
 
   const duplicated = await prisma.variant.create({
     data: {
       productId: variant.productId,
-      title: `${variant.title} copy`,
+      title: variant.product.title,
       color: variant.color,
       size: variant.size,
       price: variant.price,
@@ -618,12 +668,12 @@ export async function expandVariantSizes(id: string, input: unknown) {
   const sourceArticle = buildVariantArticle(source.product.title, source.color, sourceSize);
   let updatedVariants = 0;
 
-  if (sourceNeedsSize || source.title !== variantTitleForSize(source.product.title, source.color, sourceSize)) {
+  if (sourceNeedsSize || source.title !== source.product.title) {
     await prisma.variant.update({
       where: { id: source.id },
       data: {
         size: sourceSize,
-        title: variantTitleForSize(source.product.title, source.color, sourceSize),
+        title: source.product.title,
         description: buildVariantDescription({
           title: source.product.title,
           materials,
@@ -655,7 +705,7 @@ export async function expandVariantSizes(id: string, input: unknown) {
     const created = await prisma.variant.create({
       data: {
         productId: source.productId,
-        title: variantTitleForSize(source.product.title, source.color, size),
+        title: source.product.title,
         color: source.color,
         size,
         price: source.price,

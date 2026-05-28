@@ -51,7 +51,6 @@ describe("createProductWithVariantsSchema", () => {
       baseCategory: "Одежда, обувь, аксессуары",
       variants: [
         {
-          title: "Nike Stussy Black M",
           color: "Black",
           size: "M",
           price: "12990",
