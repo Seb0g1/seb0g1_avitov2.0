@@ -7,6 +7,7 @@ import type { PublicationMode, VariantStatus } from "@prisma/client";
 import {
   AlertTriangle,
   CheckSquare,
+  CloudDownload,
   Download,
   ExternalLink,
   FileSpreadsheet,
@@ -73,6 +74,8 @@ export function CatalogClient({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [isImportingXlsx, setIsImportingXlsx] = useState(false);
+  const [cloudImportDate, setCloudImportDate] = useState("");
+  const [isImportingCloud, setIsImportingCloud] = useState(false);
   const xlsxInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -249,6 +252,48 @@ export function CatalogClient({
     }
   }
 
+  async function importFromMailCloud(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const date = cloudImportDate.trim();
+    if (!date) {
+      setMessage("Укажите дату дропа для импорта из облака.");
+      return;
+    }
+
+    setIsImportingCloud(true);
+    setMessage("Импортирую дроп из Mail Cloud...");
+    try {
+      const response = await fetch("/api/imports/mail-cloud-drop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date })
+      });
+      const body = (await response.json().catch(() => null)) as {
+        createdProducts?: number;
+        createdVariants?: number;
+        photosImported?: number;
+        skippedExisting?: number;
+        warnings?: string[];
+        message?: string;
+      } | null;
+
+      if (!response.ok) {
+        setMessage(body?.message ?? "Не удалось импортировать дроп из Mail Cloud.");
+        return;
+      }
+
+      const warnings = body?.warnings?.length
+        ? ` Предупреждения: ${body.warnings.slice(0, 3).join("; ")}${body.warnings.length > 3 ? "..." : ""}`
+        : "";
+      setMessage(
+        `Mail Cloud: создано товаров ${body?.createdProducts ?? 0}, вариантов ${body?.createdVariants ?? 0}, фото ${body?.photosImported ?? 0}, пропущено ${body?.skippedExisting ?? 0}.${warnings}`
+      );
+      startTransition(() => router.refresh());
+    } finally {
+      setIsImportingCloud(false);
+    }
+  }
+
   return (
     <div className="grid">
       <form className="toolbar" onSubmit={applyFilters}>
@@ -351,6 +396,22 @@ export function CatalogClient({
           <Upload size={18} aria-hidden />
           Импорт XLSX
         </button>
+        <form className="toolbar" style={{ marginBottom: 0 }} onSubmit={importFromMailCloud}>
+          <label>
+            Дата дропа
+            <input
+              className="field"
+              value={cloudImportDate}
+              onChange={(event) => setCloudImportDate(event.target.value)}
+              placeholder="28.05.2026"
+              inputMode="numeric"
+            />
+          </label>
+          <button className="button primary" type="submit" disabled={isImportingCloud || isPending}>
+            <CloudDownload size={18} aria-hidden />
+            Импорт из облака
+          </button>
+        </form>
       </div>
 
       {feedDiagnostics.actionableSkippedRows > 0 ? (

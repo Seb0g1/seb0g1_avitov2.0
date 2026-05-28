@@ -6,26 +6,35 @@ import { env, resolveUploadDir } from "@/server/config/env";
 
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-export async function saveVariantPhoto(variantId: string, file: File) {
-  if (!allowedTypes.has(file.type)) {
+function extensionFromMimeType(type: string) {
+  return type === "image/png" ? ".png" : type === "image/webp" ? ".webp" : ".jpg";
+}
+
+export async function saveVariantPhotoBuffer(input: {
+  variantId: string;
+  buffer: Buffer;
+  mimeType: string;
+  sourceName?: string;
+  logMessage?: string;
+}) {
+  if (!allowedTypes.has(input.mimeType)) {
     throw new Error("Поддерживаются только JPG, PNG и WebP изображения.");
   }
 
-  const ext = file.type === "image/png" ? ".png" : file.type === "image/webp" ? ".webp" : ".jpg";
-  const filename = `${variantId}-${Date.now()}-${crypto.randomUUID()}${ext}`;
+  const ext = extensionFromMimeType(input.mimeType);
+  const filename = `${input.variantId}-${Date.now()}-${crypto.randomUUID()}${ext}`;
   const uploadDir = resolveUploadDir();
   await fs.mkdir(uploadDir, { recursive: true });
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   const absolutePath = path.join(uploadDir, filename);
-  await fs.writeFile(absolutePath, buffer);
+  await fs.writeFile(absolutePath, input.buffer);
 
-  const photoCount = await prisma.photo.count({ where: { variantId } });
+  const photoCount = await prisma.photo.count({ where: { variantId: input.variantId } });
   const publicUrl = `${env.APP_PUBLIC_URL.replace(/\/$/, "")}/uploads/${filename}`;
 
   const photo = await prisma.photo.create({
     data: {
-      variantId,
+      variantId: input.variantId,
       path: absolutePath,
       publicUrl,
       sortOrder: photoCount
@@ -34,12 +43,21 @@ export async function saveVariantPhoto(variantId: string, file: File) {
 
   await prisma.actionLog.create({
     data: {
-      message: "Variant photo uploaded",
-      context: { variantId, photoId: photo.id }
+      message: input.logMessage ?? "Variant photo uploaded",
+      context: { variantId: input.variantId, photoId: photo.id, sourceName: input.sourceName }
     }
   });
 
   return photo;
+}
+
+export async function saveVariantPhoto(variantId: string, file: File) {
+  return saveVariantPhotoBuffer({
+    variantId,
+    buffer: Buffer.from(await file.arrayBuffer()),
+    mimeType: file.type,
+    sourceName: file.name
+  });
 }
 
 export async function deletePhoto(id: string) {

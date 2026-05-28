@@ -45,6 +45,10 @@ const envSchema = z.object({
   STORE_PHONE: z.string().default("+79778274540"),
   STORE_EMAIL: z.string().email().default("seboggame@gmail.com"),
   STORE_COMPANY_NAME: z.string().default("Точка Стиля"),
+  MAIL_CLOUD_LOGIN: z.string().optional(),
+  MAIL_CLOUD_APP_PASSWORD: z.string().optional(),
+  MAIL_CLOUD_WEBDAV_URL: z.string().url().default("https://webdav.cloud.mail.ru"),
+  MAIL_CLOUD_ROOT_PATH: z.string().default("/ДРОПЧИК"),
   DEFAULT_AVITO_CATEGORY: z.string().default("Одежда, обувь, аксессуары"),
   DEFAULT_CONDITION: z.string().default("Новое с биркой")
 });
