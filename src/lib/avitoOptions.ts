@@ -192,6 +192,23 @@ export const maxClothingMaterials = 5;
 export const defaultAdType = "Товар приобретен на продажу";
 export const defaultClothingCondition = "Новое с биркой";
 export const defaultClothingItem = "Футболка";
+export const avitoBaseCategoryOptions = ["Одежда, обувь, аксессуары"] as const;
+export const defaultAvitoBaseCategory = avitoBaseCategoryOptions[0];
+
+export function normalizeAvitoBaseCategory(input?: unknown, fallback: string = defaultAvitoBaseCategory) {
+  const value = String(input ?? "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  const normalizedFallback =
+    avitoBaseCategoryOptions.find((option) => option.toLowerCase() === String(fallback).trim().toLowerCase()) ??
+    defaultAvitoBaseCategory;
+  const exact = avitoBaseCategoryOptions.find((option) => option.toLowerCase() === value.toLowerCase());
+  if (exact) {
+    return exact;
+  }
+  if (!value || !/[A-Za-zА-Яа-яЁё]/.test(value)) {
+    return normalizedFallback;
+  }
+  return value;
+}
 
 export const clothingColorOptions = [
   "Красный",

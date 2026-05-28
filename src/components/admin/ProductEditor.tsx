@@ -8,7 +8,9 @@ import {
   clothingCategoryOptions,
   clothingColorOptions,
   avitoColorSwatch,
+  avitoBaseCategoryOptions,
   defaultSizeForCategory,
+  defaultAvitoBaseCategory,
   defaultAdType,
   defaultClothingCategory,
   defaultClothingCondition,
@@ -18,6 +20,7 @@ import {
   isBagCategory,
   materialOptionsForCategory,
   maxClothingMaterials,
+  normalizeAvitoBaseCategory,
   normalizeMaterialsForCategory,
   sizeOptionsForCategory,
   type ClothingCategoryOption
@@ -83,6 +86,7 @@ export function ProductEditor({
   const [variantDeleteTarget, setVariantDeleteTarget] = useState<string | null>(null);
   const [newVariantColor, setNewVariantColor] = useState("Чёрный");
   const attributes = product.avitoAttributes ?? {};
+  const baseCategory = normalizeAvitoBaseCategory(product.baseCategory);
   const adType = String(attributes.adType ?? defaultAdType);
   const condition = String(attributes.condition ?? defaultClothingCondition);
   const clothingCategory = String(attributes.clothingCategory ?? defaultClothingCategory);
@@ -318,7 +322,6 @@ export function ProductEditor({
     <div className="split">
       <section className="editor-section">
         <form className="grid" onSubmit={updateProduct}>
-          <input type="hidden" name="baseCategory" value={product.baseCategory} />
           <div>
             <p className="eyebrow">Товар Avito</p>
             <h2>Карточка товара</h2>
@@ -340,6 +343,16 @@ export function ProductEditor({
                 <option key={option} value={option} />
               ))}
             </datalist>
+          </label>
+          <label>
+            Категория Avito
+            <select className="select" name="baseCategory" defaultValue={baseCategory || defaultAvitoBaseCategory} required>
+              {avitoBaseCategoryOptions.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Категория товара

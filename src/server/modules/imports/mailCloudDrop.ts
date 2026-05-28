@@ -1,6 +1,6 @@
 import { Prisma, VariantStatus } from "@prisma/client";
 import { convert } from "xmlbuilder2";
-import { normalizeAvitoColor } from "@/lib/avitoOptions";
+import { normalizeAvitoBaseCategory, normalizeAvitoColor } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import { supplierToPrismaData } from "@/server/modules/suppliers/moysklad";
@@ -688,7 +688,7 @@ async function createImportedProduct(draft: DropProductDraft, client: MailCloudC
     data: {
       title: draft.title,
       brand: null,
-      baseCategory: env.DEFAULT_AVITO_CATEGORY,
+      baseCategory: normalizeAvitoBaseCategory(env.DEFAULT_AVITO_CATEGORY),
       baseDescription: null,
       ...productSupplierData,
       avitoAttributes: {

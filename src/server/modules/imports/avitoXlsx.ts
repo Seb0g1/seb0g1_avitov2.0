@@ -6,6 +6,7 @@ import {
   defaultClothingCondition,
   defaultClothingItem,
   getClothingCategoryOption,
+  normalizeAvitoBaseCategory,
   normalizeAvitoColor,
   normalizeMaterialsForCategory,
   type ClothingCategoryOption
@@ -470,7 +471,7 @@ async function upsertImportRow(row: ParsedAvitoXlsxRow) {
   const productData = {
     title: productTitle,
     brand: row.brand,
-    baseCategory: row.category,
+    baseCategory: normalizeAvitoBaseCategory(row.category),
     baseDescription: row.description,
     avitoAttributes: productAttributes(row, asRecord(existingProduct?.avitoAttributes))
   };

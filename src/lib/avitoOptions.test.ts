@@ -2,11 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   getClothingCategoryOption,
   materialOptionsForCategory,
+  defaultAvitoBaseCategory,
   normalizeAvitoColor,
+  normalizeAvitoBaseCategory,
   normalizeMaterialsForCategory
 } from "./avitoOptions";
 
 describe("Avito options", () => {
+  it("falls back from empty or punctuation-only Avito categories", () => {
+    expect(normalizeAvitoBaseCategory("")).toBe(defaultAvitoBaseCategory);
+    expect(normalizeAvitoBaseCategory(", ,")).toBe(defaultAvitoBaseCategory);
+    expect(normalizeAvitoBaseCategory("Одежда, обувь, аксессуары")).toBe(defaultAvitoBaseCategory);
+  });
+
   it("normalizes color spelling to Avito values", () => {
     expect(normalizeAvitoColor("Черный")).toBe("Чёрный");
     expect(normalizeAvitoColor("Желтый")).toBe("Жёлтый");

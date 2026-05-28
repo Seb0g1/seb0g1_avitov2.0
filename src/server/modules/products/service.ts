@@ -7,6 +7,7 @@ import {
   defaultClothingItem,
   getClothingCategoryOption,
   isBagCategory,
+  normalizeAvitoBaseCategory,
   normalizeAvitoColor,
   normalizeMaterialsForCategory,
   sizeOptionsForCategory
@@ -222,6 +223,7 @@ export async function createProduct(input: unknown) {
   const product = await prisma.product.create({
     data: {
       ...productData,
+      baseCategory: normalizeAvitoBaseCategory(productData.baseCategory),
       ...supplierToPrismaData({ supplierUrl, supplierName }),
       avitoAttributes:
         avitoAttributes === null
@@ -311,7 +313,7 @@ export async function createProductWithVariants(input: unknown) {
       data: {
         title: data.title,
         brand: data.brand,
-        baseCategory: data.baseCategory,
+        baseCategory: normalizeAvitoBaseCategory(data.baseCategory),
         baseDescription: data.baseDescription,
         ...supplierData,
         avitoAttributes: attributes as Prisma.InputJsonValue,
@@ -346,6 +348,12 @@ export async function createProductWithVariants(input: unknown) {
 export async function updateProduct(id: string, input: unknown) {
   const data = updateProductSchema.parse(input);
   const { avitoAttributes, supplierUrl, supplierName, ...productData } = data;
+  const normalizedProductData = {
+    ...productData,
+    ...(productData.baseCategory !== undefined
+      ? { baseCategory: normalizeAvitoBaseCategory(productData.baseCategory) }
+      : {})
+  };
   const existing = await prisma.product.findUnique({ where: { id }, select: { avitoAttributes: true } });
   const mergedAttributes =
     avitoAttributes === undefined
@@ -360,7 +368,7 @@ export async function updateProduct(id: string, input: unknown) {
   const product = await prisma.product.update({
     where: { id },
     data: {
-      ...productData,
+      ...normalizedProductData,
       ...supplierData,
       avitoAttributes: mergedAttributes
     }
@@ -384,9 +392,8 @@ export async function listAvitoCategories() {
   });
 
   return uniqueValues([
-    "Одежда, обувь, аксессуары",
-    env.DEFAULT_AVITO_CATEGORY,
-    ...categories.map((category) => category.baseCategory)
+    normalizeAvitoBaseCategory(env.DEFAULT_AVITO_CATEGORY),
+    ...categories.map((category) => normalizeAvitoBaseCategory(category.baseCategory))
   ].filter(usableBaseCategory));
 }
 

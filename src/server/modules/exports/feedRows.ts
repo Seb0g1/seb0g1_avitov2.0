@@ -1,5 +1,10 @@
 import { VariantStatus } from "@prisma/client";
-import { getClothingCategoryOption, isFootwearCategory, normalizeAvitoColor } from "@/lib/avitoOptions";
+import {
+  getClothingCategoryOption,
+  isFootwearCategory,
+  normalizeAvitoBaseCategory,
+  normalizeAvitoColor
+} from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import {
@@ -331,7 +336,10 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const manufacturerColors = asRecord(attributes.manufacturerColors);
     const templateFields = stringArray(attributes.categoryTemplateFields);
     const sizeRequired = templateFields.length === 0 || templateFields.includes("Size");
-    const category = safeText(variant.product.baseCategory, clothingFeedFieldMap.category);
+    const category = normalizeAvitoBaseCategory(
+      variant.product.baseCategory,
+      normalizeAvitoBaseCategory(clothingFeedFieldMap.category)
+    );
     const brand = repairText(variant.product.brand) || null;
     const goodsType = safeText(attributes.goodsType, categoryOption.goodsType, ["GoodsType"]);
     const rawSize = repairText(variant.size);
