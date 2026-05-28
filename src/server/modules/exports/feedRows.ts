@@ -1,9 +1,12 @@
 import { VariantStatus } from "@prisma/client";
 import {
+  clothingCategoryOptions,
+  clothingColorOptions,
   getClothingCategoryOption,
   isFootwearCategory,
   normalizeAvitoBaseCategory,
-  normalizeAvitoColor
+  normalizeAvitoColor,
+  type ClothingCategoryOption
 } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
@@ -147,6 +150,255 @@ function categoryFields(value: unknown) {
       ? [{ tag, value: fieldValue }]
       : [];
   });
+}
+
+const maxAvitoImageCount = 10;
+const brandFallback = "Без бренда";
+const genericBrandWords = new Set([
+  "майка",
+  "футболка",
+  "худи",
+  "зип-худи",
+  "зипхуди",
+  "толстовка",
+  "кофта",
+  "шорты",
+  "джинсы",
+  "кроссовки",
+  "кеды",
+  "куртка",
+  "ветровка",
+  "лонгслив",
+  "свитшот",
+  "поло",
+  "товар",
+  "одежда",
+  "обувь"
+]);
+const knownFeedBrands = [
+  "Acne Studios",
+  "Stone Island",
+  "Enfants Riches Deprimes",
+  "New Balance",
+  "Louis Vuitton",
+  "Ralph Lauren",
+  "Palm Angels",
+  "Comme des Garcons",
+  "Nike x Stussy",
+  "Nike",
+  "Stussy",
+  "Balenciaga",
+  "Adidas",
+  "Supreme",
+  "Carhartt",
+  "ARCTERYX",
+  "Patagonia",
+  "Jordan",
+  "Puma",
+  "Reebok",
+  "Asics",
+  "Prada",
+  "Corteiz",
+  "Gucci",
+  "Ami",
+  "Levi'S®",
+  "Bape",
+  "A Bathing Ape",
+  "Vetements",
+  "MASTERMIND JAPAN",
+  "ERD"
+];
+
+export function normalizeFeedBrand(input: unknown, title: string) {
+  const brand = repairText(input);
+  const normalizedBrand = normalizeKnownBrand(brand);
+  if (normalizedBrand && !genericBrandWords.has(normalizedBrand.toLowerCase())) {
+    return normalizedBrand;
+  }
+
+  return inferBrandFromTitle(title) ?? brandFallback;
+}
+
+function normalizeKnownBrand(value: string) {
+  const text = value.trim();
+  if (!text) {
+    return null;
+  }
+
+  const lower = text.toLowerCase();
+  const aliases: Record<string, string> = {
+    "arc'teryx": "ARCTERYX",
+    arcteryx: "ARCTERYX",
+    "mastermind japan": "MASTERMIND JAPAN",
+    erd: "Enfants Riches Deprimes",
+    levi: "Levi'S®",
+    levis: "Levi'S®",
+    "levi's": "Levi'S®",
+    "levi’s": "Levi'S®",
+    bape: "Bape",
+    "a bathing ape": "Bape",
+    "palm angels": "PALM ANGELS",
+    "nike x stussy": "Nike",
+    "ami paris": "Ami"
+  };
+  if (aliases[lower]) {
+    return aliases[lower];
+  }
+
+  const known = knownFeedBrands.find((brand) => lower === brand.toLowerCase());
+  return known ?? text;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function titleContainsBrand(title: string, brand: string) {
+  const brandText = brand.toLowerCase();
+  if (brandText.length <= 3) {
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(brandText)}([^\\p{L}\\p{N}]|$)`, "u").test(title);
+  }
+  return title.includes(brandText);
+}
+
+function inferBrandFromTitle(title: string) {
+  const lower = title.toLowerCase();
+  const known = knownFeedBrands.find((brand) => titleContainsBrand(lower, brand));
+  if (known) {
+    return normalizeKnownBrand(known);
+  }
+
+  const cleaned = title
+    .replace(/\([^)]*\)/g, "")
+    .replace(/^(майка|футболка|худи|зип-худи|зипхуди|толстовка|кофта|штаны|джинсы|кроссовки|кеды|куртка|ветровка|лонгслив|свитшот|поло)\s+/i, "")
+    .trim();
+  const firstToken = cleaned.split(/\s+/)[0]?.trim();
+  return firstToken && !genericBrandWords.has(firstToken.toLowerCase())
+    ? normalizeKnownBrand(firstToken)
+    : null;
+}
+
+export function normalizeFeedColor(input: unknown) {
+  const color = normalizeAvitoColor(repairText(input));
+  return clothingColorOptions.some((option) => option === color) ? color : "Разноцветный";
+}
+
+function includesAny(value: unknown, needles: string[]) {
+  const text = repairText(value).toLowerCase();
+  return needles.some((needle) => text.includes(needle));
+}
+
+function categoryOptionByKey(key: string) {
+  return clothingCategoryOptions.find((option) => option.key === key) ?? clothingCategoryOptions[0];
+}
+
+function resolveFeedCategoryOption(attributes: Record<string, unknown>, title: string) {
+  const explicitValue = String(attributes.clothingCategory ?? "").trim();
+  const explicit = clothingCategoryOptions.find(
+    (option) => option.key === explicitValue || option.label === explicitValue
+  );
+  if (explicit) {
+    return explicit;
+  }
+
+  const mailCloud = asRecord(attributes.mailCloud);
+  const haystack = [
+    title,
+    attributes.goodsType,
+    attributes.apparel,
+    attributes.productSubtype,
+    attributes.clothingItem,
+    mailCloud.categoryName,
+    mailCloud.categoryPath
+  ];
+
+  if (haystack.some((value) => includesAny(value, ["кроссов", "кеды", "обув"]))) {
+    return categoryOptionByKey(includesAny(attributes.goodsType, ["женск"]) ? "women-sneakers" : "men-sneakers");
+  }
+  if (haystack.some((value) => includesAny(value, ["сумк"]))) {
+    return categoryOptionByKey("bags");
+  }
+  if (haystack.some((value) => includesAny(value, ["рюкзак"]))) {
+    return categoryOptionByKey("backpacks");
+  }
+  if (haystack.some((value) => includesAny(value, ["джинс"]))) {
+    return categoryOptionByKey("jeans");
+  }
+  if (haystack.some((value) => includesAny(value, ["ветров", "куртк", "бомбер", "верхняя"]))) {
+    return categoryOptionByKey("women-light-jackets");
+  }
+  if (haystack.some((value) => includesAny(value, ["худи", "толстов", "свитшот"]))) {
+    return categoryOptionByKey("women-sweatshirts");
+  }
+  if (haystack.some((value) => includesAny(value, ["шорт"]))) {
+    return categoryOptionByKey("shorts");
+  }
+
+  return getClothingCategoryOption(attributes.clothingCategory);
+}
+
+function defaultCategoryFields(option: ClothingCategoryOption, productSubtype: string) {
+  return [
+    ...(option.categorySpecificFields ?? []),
+    ...(!option.categorySpecificFields?.length && option.extraField
+      ? [{ tag: option.extraField, value: option.extraValue ?? productSubtype }]
+      : [])
+  ];
+}
+
+function isOuterwearOption(option: ClothingCategoryOption) {
+  return option.key === "bombers" || option.key === "women-light-jackets" || option.goodsType === "Верхняя одежда";
+}
+
+function normalizeGoodsTypeForFeed(goodsType: string, option: ClothingCategoryOption) {
+  if (isOuterwearOption(option) && goodsType === "Верхняя одежда") {
+    return "Мужская одежда";
+  }
+  if (goodsType === "Одежда, обувь, аксессуары") {
+    return option.goodsType;
+  }
+  return goodsType;
+}
+
+function normalizeApparelForFeed(apparel: string, option: ClothingCategoryOption) {
+  if (!apparel || apparel === "Одежда, обувь, аксессуары" || apparel === option.goodsType) {
+    return option.apparel;
+  }
+  return apparel;
+}
+
+function normalizedCategorySpecificFields(input: {
+  configured: Array<{ tag: string; value: string }>;
+  option: ClothingCategoryOption;
+  category: string;
+  goodsType: string;
+  clothingItem: string;
+  productSubtype: string;
+}) {
+  const templateFields = new Set(input.option.templateFields ?? []);
+  const invalidValues = new Set([
+    "",
+    input.category,
+    normalizeAvitoBaseCategory(input.category),
+    input.goodsType,
+    input.clothingItem,
+    "Одежда, обувь, аксессуары"
+  ]);
+  const result = new Map<string, { tag: string; value: string }>();
+
+  for (const field of defaultCategoryFields(input.option, input.productSubtype)) {
+    result.set(field.tag, { tag: field.tag, value: field.value || input.productSubtype });
+  }
+
+  for (const field of input.configured) {
+    const allowedByTemplate = templateFields.size === 0 || templateFields.has(field.tag);
+    const broadValue = invalidValues.has(field.value);
+    if (allowedByTemplate && !broadValue) {
+      result.set(field.tag, field);
+    }
+  }
+
+  return [...result.values()];
 }
 
 export function normalizeFeedSize(size: string): string | null {
@@ -330,7 +582,9 @@ export async function getFeedRowsWithDiagnostics(options?: {
   const rows = variants.flatMap<FeedRow>((variant) => {
     const attributes = asRecord(variant.product.avitoAttributes);
     const geo = getFeedGeo(attributes);
-    const categoryOption = getClothingCategoryOption(attributes.clothingCategory);
+    const productTitle = repairText(variant.product.title) || "Товар";
+    const variantTitle = repairText(variant.title) || productTitle;
+    const categoryOption = resolveFeedCategoryOption(attributes, productTitle);
     const materials = normalizeMaterialsForCategory(attributes.materials, attributes.material, categoryOption);
     const material = formatMaterialsForCategory(attributes.materials, attributes.material, categoryOption);
     const manufacturerColors = asRecord(attributes.manufacturerColors);
@@ -340,17 +594,18 @@ export async function getFeedRowsWithDiagnostics(options?: {
       variant.product.baseCategory,
       normalizeAvitoBaseCategory(clothingFeedFieldMap.category)
     );
-    const brand = repairText(variant.product.brand) || null;
-    const goodsType = safeText(attributes.goodsType, categoryOption.goodsType, ["GoodsType"]);
+    const brand = normalizeFeedBrand(variant.product.brand, productTitle);
+    const goodsType = normalizeGoodsTypeForFeed(
+      safeText(attributes.goodsType, categoryOption.goodsType, ["GoodsType"]),
+      categoryOption
+    );
     const rawSize = repairText(variant.size);
     const size = normalizeFeedSizeForCategory({
       size: rawSize,
       goodsType,
       sizeRequired
     });
-    const productTitle = repairText(variant.product.title) || "Товар";
-    const variantTitle = repairText(variant.title) || productTitle;
-    const color = normalizeAvitoColor(repairText(variant.color) || "Не указан");
+    const color = normalizeFeedColor(variant.color);
     const multiItemGroup = String(attributes.multiItemGroup ?? variant.productId);
     const variantKey = sizeRequired
       ? size
@@ -359,7 +614,8 @@ export async function getFeedRowsWithDiagnostics(options?: {
       : `${multiItemGroup}:${color.trim().toLowerCase()}:nosize`;
     const photos = variant.photos
       .map((photo) => photo.publicUrl)
-      .filter((photo) => photo && !hasDamagedText(photo));
+      .filter((photo) => photo && !hasDamagedText(photo))
+      .slice(0, maxAvitoImageCount);
     const videoUrl = variant.videos.find((video) => video.publicUrl && !hasDamagedText(video.publicUrl))?.publicUrl ?? null;
     const price = Number(variant.price);
     const reasons = getFeedValidationReasons({
@@ -402,7 +658,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const availableVariants = variant.product.variants
       .filter((productVariant) => productVariant.quantity > 0)
       .map((productVariant) => ({
-        color: normalizeAvitoColor(repairText(productVariant.color) || "Не указан"),
+        color: normalizeFeedColor(productVariant.color),
         size: normalizeFeedSizeForCategory({
           size: repairText(productVariant.size),
           goodsType,
@@ -424,10 +680,13 @@ export async function getFeedRowsWithDiagnostics(options?: {
       ["Condition"]
     );
     const adType = safeText(attributes.adType, clothingFeedDefaults.adType, ["AdType"]);
-    const clothingItem = safeText(attributes.apparel, categoryOption.apparel, [
-      "ClothingType",
-      "Apparel"
-    ]);
+    const clothingItem = normalizeApparelForFeed(
+      safeText(attributes.apparel, categoryOption.apparel, [
+        "ClothingType",
+        "Apparel"
+      ]),
+      categoryOption
+    );
     const productSubtype = safeText(
       attributes.productSubtype ?? attributes.clothingSubtype ?? attributes.clothingItem,
       categoryOption.productSubtype || clothingFeedDefaults.productSubtype,
@@ -436,11 +695,19 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const configuredCategoryFields = categoryFields(attributes.categorySpecificFields);
     const categoryExtraField = safeText(attributes.categoryExtraField, categoryOption.extraField ?? "");
     const categoryExtraValue = safeText(attributes.categoryExtraValue, categoryOption.extraValue ?? productSubtype);
-    const categorySpecificFields = configuredCategoryFields.length > 0
-      ? configuredCategoryFields
-      : categoryExtraField && categoryExtraValue
-        ? [{ tag: categoryExtraField, value: categoryExtraValue }]
-        : [];
+    const categorySpecificFields = normalizedCategorySpecificFields({
+      configured: [
+        ...configuredCategoryFields,
+        ...(categoryExtraField && categoryExtraValue
+          ? [{ tag: categoryExtraField, value: categoryExtraValue }]
+          : [])
+      ],
+      option: categoryOption,
+      category,
+      goodsType,
+      clothingItem,
+      productSubtype
+    });
 
     return [{
       externalId: `${variant.productId}-${variant.id}`,
@@ -469,7 +736,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       categorySpecificFields,
       templateFields,
       multiItemName: safeText(attributes.multiItemName, productTitle),
-      manufacturerColor: normalizeAvitoColor(
+      manufacturerColor: normalizeFeedColor(
         repairText(manufacturerColors[variant.color] ?? manufacturerColors[color] ?? color) || color
       ),
       material,

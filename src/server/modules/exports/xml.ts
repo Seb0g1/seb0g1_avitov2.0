@@ -24,7 +24,7 @@ export function buildAvitoXml(rows: FeedRow[]) {
     }
 
     const images = ad.ele("Images");
-    for (const photo of row.photos) {
+    for (const photo of row.photos.slice(0, 10)) {
       images.ele("Image", { url: photo });
     }
     if (row.videoUrl) {

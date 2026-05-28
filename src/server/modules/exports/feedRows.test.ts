@@ -4,6 +4,8 @@ import {
   getFeedValidationReasons,
   isActionableFeedStatus,
   normalizeContactPhone,
+  normalizeFeedBrand,
+  normalizeFeedColor,
   normalizeFeedSize,
   normalizeFeedSizeForCategory
 } from "./feedRows";
@@ -41,6 +43,23 @@ describe("feed row validation", () => {
   it("normalizes Russian contact phones with a plus prefix", () => {
     expect(normalizeContactPhone("+7 977 827-45-40")).toBe("+79778274540");
     expect(normalizeContactPhone("89778274540")).toBe("+79778274540");
+  });
+
+  it("normalizes feminine and unknown colors for Avito values", () => {
+    expect(normalizeFeedColor("Белая")).toBe("Белый");
+    expect(normalizeFeedColor("Серая")).toBe("Серый");
+    expect(normalizeFeedColor("Чёрная")).toBe("Чёрный");
+    expect(normalizeFeedColor("black")).toBe("Чёрный");
+    expect(normalizeFeedColor("Не указан")).toBe("Разноцветный");
+  });
+
+  it("normalizes generic imported brands to Avito catalog names", () => {
+    expect(normalizeFeedBrand("Майка", "Майка bape Baby Milo")).toBe("Bape");
+    expect(normalizeFeedBrand("Поло", "Поло Corteiz")).toBe("Corteiz");
+    expect(normalizeFeedBrand("поло", "Футболка поло Ami Paris")).toBe("Ami");
+    expect(normalizeFeedBrand("Mastermind Japan", "Зип-Худи Mastermind Japan black")).toBe("MASTERMIND JAPAN");
+    expect(normalizeFeedBrand("ERD", "Футболка ERD black")).toBe("Enfants Riches Deprimes");
+    expect(normalizeFeedBrand("поло", "Футболка поло Not From Paris Madame")).toBe("Без бренда");
   });
 
   it("skips rows without photos", () => {

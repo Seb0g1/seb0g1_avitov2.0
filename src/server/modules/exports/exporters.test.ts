@@ -118,6 +118,19 @@ describe("Avito exporters", () => {
     expect(xml).not.toContain("Рњ");
   });
 
+  it("limits XML photos to Avito maximum", () => {
+    const xml = buildAvitoXml([
+      {
+        ...rows[0],
+        photos: Array.from({ length: 12 }, (_, index) => `https://example.com/${index}.jpg`)
+      }
+    ]);
+
+    expect(xml.match(/<Image /g)).toHaveLength(10);
+    expect(xml).toContain("https://example.com/9.jpg");
+    expect(xml).not.toContain("https://example.com/10.jpg");
+  });
+
   it("uses category-specific XML fields from Avito clothing templates", () => {
     const xml = buildAvitoXml([
       {
