@@ -14,4 +14,5 @@ export type StatusSyncPayload = {
 export type MailCloudImportPayload = {
   jobId: string;
   date: string;
+  productPaths?: string[];
 };

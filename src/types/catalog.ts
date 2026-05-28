@@ -1,4 +1,4 @@
-import type { JobStatus, JobType, LogLevel, PublicationMode, VariantStatus } from "@prisma/client";
+import type { JobStatus, JobType, LogLevel, PublicationMode, UserRole, VariantStatus } from "@prisma/client";
 
 export type PhotoDto = {
   id: string;
@@ -119,4 +119,103 @@ export type ErrorLogDto = {
   source: string;
   message: string;
   createdAt: string;
+};
+
+export type CurrentUserDto = {
+  id: string;
+  email: string;
+  role: UserRole;
+  name: string | null;
+};
+
+export type ThemeMode = "white" | "black" | "pink" | "blue";
+export type CatalogViewMode = "table" | "cards";
+export type DashboardPeriod = "today" | "7d" | "30d" | "all";
+
+export type UserPreferencesDto = {
+  themeMode: ThemeMode;
+  catalogFilters: {
+    search: string;
+    color: string;
+    size: string;
+    status: VariantStatus | "";
+    category: string;
+    supplier: string;
+    withoutSupplier: boolean;
+    withoutPhotos: boolean;
+    xmlIssues: boolean;
+  };
+  catalogViewMode: CatalogViewMode;
+  catalogSort: string;
+  dashboardPeriod: DashboardPeriod;
+};
+
+export type EmployeeDto = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  preferences?: UserPreferencesDto;
+};
+
+export type EmployeeStatsDto = {
+  employee: EmployeeDto;
+  actions: number;
+  productsCreated: number;
+  productsUpdated: number;
+  variantsCreated: number;
+  variantsUpdated: number;
+  imports: number;
+  publications: number;
+  errors: number;
+};
+
+export type MailCloudPreviewFileDto = {
+  name: string;
+  path: string;
+  previewUrl: string;
+  contentType: string | null;
+  contentLength: number | null;
+};
+
+export type MailCloudPreviewProductDto = {
+  title: string;
+  date: string;
+  categoryName: string;
+  categoryPath: string;
+  productPath: string;
+  productFolderName: string;
+  existing: boolean;
+  info: {
+    supplierUrl: string | null;
+    price: number | null;
+    color: string | null;
+    warnings: string[];
+  };
+  infoText: string | null;
+  variants: Array<{
+    title: string;
+    color: string;
+    price: number;
+    supplierUrl: string | null;
+    infoText: string | null;
+    sourcePath: string;
+    photos: MailCloudPreviewFileDto[];
+    videos: MailCloudPreviewFileDto[];
+  }>;
+};
+
+export type MailCloudPreviewDto = {
+  date: string;
+  products: MailCloudPreviewProductDto[];
+  categories: Array<{
+    name: string;
+    path: string;
+    products: MailCloudPreviewProductDto[];
+  }>;
+  warnings: string[];
 };

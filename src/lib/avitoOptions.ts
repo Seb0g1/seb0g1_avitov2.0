@@ -171,13 +171,21 @@ export const jeansMaterialOptions = [
   "Эластан"
 ] as const;
 
+export const bagMaterialOptions = [
+  "Натуральная кожа",
+  "Искусственная кожа",
+  "Другой"
+] as const;
+
 export const defaultClothingMaterials = ["Хлопок"];
 export const defaultFootwearMaterials = ["Синтетический"];
 export const defaultJeansMaterials = ["Джинса/деним"];
+export const defaultBagMaterials = ["Натуральная кожа"];
 export const avitoMaterialOptions = [
   ...clothingMaterialOptions,
   ...footwearMaterialOptions,
-  ...jeansMaterialOptions
+  ...jeansMaterialOptions,
+  ...bagMaterialOptions
 ] as const;
 export const avitoMaterialValues = [...new Set(avitoMaterialOptions.map((material) => material))];
 export const maxClothingMaterials = 5;
@@ -286,6 +294,12 @@ export function isJeansCategory(option: CategoryKindInput) {
     .some((value) => value.includes("джинс"));
 }
 
+export function isBagCategory(option: CategoryKindInput) {
+  const values = [option.key, option.label, option.apparel, option.productSubtype]
+    .map((value) => String(value ?? "").toLowerCase());
+  return /сумки, рюкзаки и чемоданы/i.test(option.goodsType) && values.some((value) => value.includes("сум"));
+}
+
 export function sizeOptionsForCategory(option: Pick<ClothingCategoryOption, "goodsType">) {
   return isFootwearCategory(option) ? footwearSizeOptions : clothingSizeOptions;
 }
@@ -296,6 +310,9 @@ export function defaultSizeForCategory(option: Pick<ClothingCategoryOption, "goo
 }
 
 export function materialOptionsForCategory(option: CategoryKindInput) {
+  if (isBagCategory(option)) {
+    return bagMaterialOptions;
+  }
   if (isJeansCategory(option)) {
     return jeansMaterialOptions;
   }
@@ -303,6 +320,9 @@ export function materialOptionsForCategory(option: CategoryKindInput) {
 }
 
 export function defaultMaterialsForCategory(option: CategoryKindInput) {
+  if (isBagCategory(option)) {
+    return [...defaultBagMaterials];
+  }
   if (isJeansCategory(option)) {
     return [...defaultJeansMaterials];
   }
@@ -458,7 +478,7 @@ export const clothingCategoryOptions: readonly ClothingCategoryOption[] = [
     extraValue: "Сумки",
     categorySpecificFields: [
       { tag: "ApparelType", value: "Сумки" },
-      { tag: "Material", value: "Текстиль" },
+      { tag: "Material", value: "Натуральная кожа" },
       { tag: "Gender", value: "Унисекс" }
     ],
     templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Model", "Color", "ColorName", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "ApparelType", "Material", "Gender", "TargetAudience"]
@@ -574,6 +594,19 @@ const jeansMaterialAliases: Array<[string, string]> = [
   ["футер", "Футер"]
 ];
 
+const bagMaterialAliases: Array<[string, string]> = [
+  ["искусственная кожа", "Искусственная кожа"],
+  ["экокожа", "Искусственная кожа"],
+  ["эко кожа", "Искусственная кожа"],
+  ["кожзам", "Искусственная кожа"],
+  ["натуральная кожа", "Натуральная кожа"],
+  ["кожа", "Натуральная кожа"],
+  ["друг", "Другой"],
+  ["текстиль", "Другой"],
+  ["полиэстер", "Другой"],
+  ["нейлон", "Другой"]
+];
+
 function uniqueFilled(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
@@ -632,12 +665,14 @@ export function normalizeMaterialsForCategory(
   const fromLegacy = typeof legacyMaterial === "string" ? legacyMaterial.split(",") : [];
   const footwear = isFootwearCategory(option);
   const jeans = isJeansCategory(option);
+  const bag = isBagCategory(option);
   const options = materialOptionsForCategory(option);
-  const aliases = jeans ? jeansMaterialAliases : footwear ? footwearMaterialAliases : materialAliases;
+  const aliases = bag ? bagMaterialAliases : jeans ? jeansMaterialAliases : footwear ? footwearMaterialAliases : materialAliases;
   const normalized = uniqueFilled(
-    [...fromArray, ...fromLegacy].map((value) =>
-      normalizeOneMaterial(value, options, aliases, footwear || jeans)
-    )
+    [...fromArray, ...fromLegacy].map((value) => {
+      const normalized = normalizeOneMaterial(value, options, aliases, footwear || jeans || bag);
+      return normalized || (bag && value.trim() ? "Другой" : normalized);
+    })
   ).slice(0, maxClothingMaterials);
 
   return normalized.length > 0 ? normalized : defaultMaterialsForCategory(option);

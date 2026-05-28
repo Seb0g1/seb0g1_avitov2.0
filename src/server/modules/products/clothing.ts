@@ -1,4 +1,5 @@
 import {
+  bagMaterialOptions,
   avitoSizeOptions,
   avitoSizeValues,
   avitoMaterialOptions,
@@ -7,6 +8,7 @@ import {
   clothingSizeOptions,
   clothingSizeValues,
   defaultAdType,
+  defaultBagMaterials,
   defaultClothingCondition,
   defaultClothingItem,
   defaultJeansMaterials,
@@ -17,6 +19,7 @@ import {
   footwearSizeValues,
   formatClothingMaterials,
   formatMaterialsForCategory,
+  isBagCategory,
   isFootwearCategory,
   isJeansCategory,
   jeansMaterialOptions,
@@ -27,6 +30,7 @@ import {
 } from "@/lib/avitoOptions";
 
 export {
+  bagMaterialOptions,
   avitoSizeOptions,
   avitoSizeValues,
   avitoMaterialOptions,
@@ -35,6 +39,7 @@ export {
   clothingSizeOptions,
   clothingSizeValues,
   defaultAdType,
+  defaultBagMaterials,
   defaultClothingCondition,
   defaultClothingItem,
   defaultJeansMaterials,
@@ -45,6 +50,7 @@ export {
   footwearSizeValues,
   formatClothingMaterials,
   formatMaterialsForCategory,
+  isBagCategory,
   isFootwearCategory,
   isJeansCategory,
   jeansMaterialOptions,

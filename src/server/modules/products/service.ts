@@ -6,6 +6,7 @@ import {
   defaultClothingCondition,
   defaultClothingItem,
   getClothingCategoryOption,
+  isBagCategory,
   normalizeAvitoColor,
   normalizeMaterialsForCategory,
   sizeOptionsForCategory
@@ -107,13 +108,20 @@ function productAttributes(input: {
       ? [{ tag: categoryOption.extraField, value: categoryOption.extraValue ?? productSubtype }]
       : []);
   const normalizedCategoryFields = categoryFields(existing.categorySpecificFields);
-  const categorySpecificFields =
+  let categorySpecificFields =
     normalizedCategoryFields.length > 0
       ? normalizedCategoryFields
       : optionCategoryFields.map((field) => ({
           tag: field.tag,
           value: field.value || productSubtype
         }));
+  if (isBagCategory(categoryOption)) {
+    categorySpecificFields = categorySpecificFields.map((field) =>
+      field.tag === "Material"
+        ? { ...field, value: materials[0] ?? "Натуральная кожа" }
+        : field
+    );
+  }
   const categoryTemplateFields =
     stringArray(existing.categoryTemplateFields).length > 0
       ? stringArray(existing.categoryTemplateFields)
@@ -146,23 +154,45 @@ export async function listProducts(input: unknown) {
     ...(query.color ? { color: { contains: query.color, mode: "insensitive" } } : {}),
     ...(query.size ? { size: { contains: query.size, mode: "insensitive" } } : {}),
     ...(query.status ? { status: query.status } : {}),
+    ...(query.withoutSupplier ? { supplierUrl: null } : {}),
+    ...(query.withoutPhotos ? { photos: { none: {} } } : {})
+  };
+  const productWhere: Prisma.ProductWhereInput = {
+    ...(query.search
+      ? {
+          OR: [
+            { title: { contains: query.search, mode: "insensitive" } },
+            { brand: { contains: query.search, mode: "insensitive" } },
+            { variants: { some: { title: { contains: query.search, mode: "insensitive" } } } }
+          ]
+        }
+      : {}),
+    ...(query.category
+      ? {
+          OR: [
+            { baseCategory: { contains: query.category, mode: "insensitive" } },
+            { avitoAttributes: { path: ["clothingCategory"], equals: query.category } },
+            { avitoAttributes: { path: ["goodsType"], string_contains: query.category } },
+            { avitoAttributes: { path: ["apparel"], string_contains: query.category } }
+          ]
+        }
+      : {}),
+    ...(query.supplier
+      ? {
+          OR: [
+            { supplierName: { contains: query.supplier, mode: "insensitive" } },
+            { supplierUrl: { contains: query.supplier, mode: "insensitive" } },
+            { variants: { some: { supplierName: { contains: query.supplier, mode: "insensitive" } } } },
+            { variants: { some: { supplierUrl: { contains: query.supplier, mode: "insensitive" } } } }
+          ]
+        }
+      : {}),
+    ...(Object.keys(variantWhere).length ? { variants: { some: variantWhere } } : {}),
     ...(query.withoutSupplier ? { supplierUrl: null } : {})
   };
 
   return prisma.product.findMany({
-    where: {
-      ...(query.search
-        ? {
-            OR: [
-              { title: { contains: query.search, mode: "insensitive" } },
-              { brand: { contains: query.search, mode: "insensitive" } },
-              { variants: { some: { title: { contains: query.search, mode: "insensitive" } } } }
-            ]
-          }
-        : {}),
-      ...(Object.keys(variantWhere).length ? { variants: { some: variantWhere } } : {}),
-      ...(query.withoutSupplier ? { supplierUrl: null } : {})
-    },
+    where: productWhere,
     include: {
       variants: {
         where: Object.keys(variantWhere).length ? variantWhere : undefined,

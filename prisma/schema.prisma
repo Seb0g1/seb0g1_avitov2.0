@@ -54,12 +54,23 @@ enum LogLevel {
   ERROR
 }
 
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
+  name         String?
+  role         UserRole @default(EMPLOYEE)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  preferences  Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  actionLogs   ActionLog[]
 }
 
 model Product {
@@ -170,7 +181,11 @@ model ActionLog {
   level     LogLevel @default(INFO)
   message   String
   context   Json?
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
+
+  @@index([actorId])
 }
 
 model ErrorLog {

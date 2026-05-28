@@ -162,7 +162,9 @@ export async function processMailCloudImportJob(payload: MailCloudImportPayload)
   });
 
   try {
-    const result = await importMailCloudDrop(payload.date);
+    const result = await importMailCloudDrop(payload.date, undefined, {
+      productPaths: payload.productPaths
+    });
     await prisma.publicationJob.update({
       where: { id: payload.jobId },
       data: {
@@ -175,7 +177,7 @@ export async function processMailCloudImportJob(payload: MailCloudImportPayload)
     await prisma.actionLog.create({
       data: {
         message: "Mail Cloud import job completed",
-        context: { jobId: payload.jobId, date: payload.date, result } as Prisma.InputJsonValue
+        context: { jobId: payload.jobId, date: payload.date, productPaths: payload.productPaths, result } as Prisma.InputJsonValue
       }
     });
     return result;
@@ -186,7 +188,7 @@ export async function processMailCloudImportJob(payload: MailCloudImportPayload)
       data: { status: JobStatus.FAILED, error: message, completedAt: new Date() }
     });
     await prisma.errorLog.create({
-      data: { source: "mailCloudImportJob", message, details: { jobId: payload.jobId, date: payload.date } }
+      data: { source: "mailCloudImportJob", message, details: { jobId: payload.jobId, date: payload.date, productPaths: payload.productPaths } }
     });
     throw error;
   }

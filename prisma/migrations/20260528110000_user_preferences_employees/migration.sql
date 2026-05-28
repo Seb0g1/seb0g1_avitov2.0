@@ -1,0 +1,19 @@
+CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'EMPLOYEE');
+
+ALTER TABLE "User"
+  ADD COLUMN "name" TEXT,
+  ADD COLUMN "role" "UserRole" NOT NULL DEFAULT 'ADMIN',
+  ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "lastLoginAt" TIMESTAMP(3),
+  ADD COLUMN "preferences" JSONB;
+
+ALTER TABLE "User" ALTER COLUMN "role" SET DEFAULT 'EMPLOYEE';
+
+ALTER TABLE "ActionLog" ADD COLUMN "actorId" TEXT;
+
+CREATE INDEX "ActionLog_actorId_idx" ON "ActionLog"("actorId");
+
+ALTER TABLE "ActionLog"
+  ADD CONSTRAINT "ActionLog_actorId_fkey"
+  FOREIGN KEY ("actorId") REFERENCES "User"("id")
+  ON DELETE SET NULL ON UPDATE CASCADE;

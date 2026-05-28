@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertMailCloudPathAllowed,
   collectMailCloudDropProducts,
+  mailCloudFileContentType,
   parseDropInfo,
   parseWebDavEntries,
   type MailCloudClient,
@@ -176,5 +178,14 @@ describe("Mail Cloud drop import parsing", () => {
         ]
       })
     ]);
+  });
+
+  it("guards Mail Cloud preview file paths", () => {
+    expect(assertMailCloudPathAllowed("/ДРОПЧИК/28.05.2026/Худи/1.jpg", "/ДРОПЧИК")).toBe(
+      "/ДРОПЧИК/28.05.2026/Худи/1.jpg"
+    );
+    expect(() => assertMailCloudPathAllowed("/Other/1.jpg", "/ДРОПЧИК")).toThrow();
+    expect(mailCloudFileContentType("/ДРОПЧИК/video.mov")).toBe("video/quicktime");
+    expect(mailCloudFileContentType("/ДРОПЧИК/инфа.txt")).toBe("text/plain; charset=utf-8");
   });
 });

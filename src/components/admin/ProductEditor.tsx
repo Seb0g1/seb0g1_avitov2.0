@@ -13,7 +13,9 @@ import {
   defaultClothingCategory,
   defaultClothingCondition,
   defaultClothingItem,
+  defaultMaterialsForCategory,
   formatMaterialsForCategory,
+  isBagCategory,
   materialOptionsForCategory,
   maxClothingMaterials,
   normalizeMaterialsForCategory,
@@ -28,6 +30,7 @@ import {
   categoryFieldsFromForm,
   categoryOptionDescription
 } from "./avitoCategoryForm";
+import { ConfirmDialog } from "./ui";
 
 const statuses: VariantStatus[] = [
   "DRAFT",
@@ -77,6 +80,7 @@ export function ProductEditor({
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
+  const [variantDeleteTarget, setVariantDeleteTarget] = useState<string | null>(null);
   const [newVariantColor, setNewVariantColor] = useState("Чёрный");
   const attributes = product.avitoAttributes ?? {};
   const adType = String(attributes.adType ?? defaultAdType);
@@ -156,11 +160,15 @@ export function ProductEditor({
         ? attributes.categorySpecificFields
         : undefined
     );
-    const categorySpecificFields = categoryFieldsFromForm(formData, nextCategoryFields);
     const normalizedMaterials = normalizeMaterialsForCategory(
       selectedMaterials,
       null,
       nextClothingCategory
+    );
+    const categorySpecificFields = categoryFieldsFromForm(formData, nextCategoryFields).map((field) =>
+      isBagCategory(nextClothingCategory) && field.tag === "Material"
+        ? { ...field, value: normalizedMaterials[0] ?? "Натуральная кожа" }
+        : field
     );
     try {
       await jsonRequest(`/api/products/${product.id}`, "PATCH", {
@@ -349,7 +357,11 @@ export function ProductEditor({
                 setEditingClothingCategory(next.key);
                 setEditingClothingItem(next.productSubtype);
                 setNewVariantSize(defaultSizeForCategory(next));
-                setSelectedMaterials((current) => normalizeMaterialsForCategory(current, null, next));
+                setSelectedMaterials((current) =>
+                  isBagCategory(next)
+                    ? defaultMaterialsForCategory(next)
+                    : normalizeMaterialsForCategory(current, null, next)
+                );
               }}
               required
             />
@@ -519,7 +531,7 @@ export function ProductEditor({
               onSubmit={updateVariant}
               onDuplicate={duplicateVariant}
               onExpandSizes={expandVariantSizes}
-              onRemove={removeVariant}
+              onRemove={(variantId) => setVariantDeleteTarget(variantId)}
               onUpload={uploadPhotos}
               onUploadVideo={uploadVideos}
               onRemovePhoto={removePhoto}
@@ -530,6 +542,20 @@ export function ProductEditor({
           ))}
         </div>
       </section>
+      <ConfirmDialog
+        open={Boolean(variantDeleteTarget)}
+        danger
+        title="Удалить вариант?"
+        description="Фото и видео этого варианта тоже будут отвязаны от карточки."
+        confirmLabel="Удалить"
+        onClose={() => setVariantDeleteTarget(null)}
+        onConfirm={() => {
+          if (variantDeleteTarget) {
+            void removeVariant(variantDeleteTarget);
+          }
+          setVariantDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

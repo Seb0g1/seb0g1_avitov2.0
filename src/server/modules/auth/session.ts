@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
+import type { UserRole } from "@prisma/client";
 import { env } from "@/server/config/env";
+import { enterActor } from "./actor";
 
 export const SESSION_COOKIE = "avito_admin_session";
 const encoder = new TextEncoder();
@@ -8,6 +10,8 @@ const encoder = new TextEncoder();
 export type SessionUser = {
   id: string;
   email: string;
+  role: UserRole;
+  name: string | null;
 };
 
 function secret() {
@@ -33,7 +37,12 @@ export async function verifySession(token?: string): Promise<SessionUser | null>
       return null;
     }
 
-    return { id: payload.id, email: payload.email };
+    return {
+      id: payload.id,
+      email: payload.email,
+      role: payload.role === "EMPLOYEE" ? "EMPLOYEE" : "ADMIN",
+      name: typeof payload.name === "string" ? payload.name : null
+    };
   } catch {
     return null;
   }
@@ -48,6 +57,15 @@ export async function requireSession() {
   const session = await getSession();
   if (!session) {
     throw new Error("UNAUTHORIZED");
+  }
+  enterActor(session.id);
+  return session;
+}
+
+export async function requireAdminSession() {
+  const session = await requireSession();
+  if (session.role !== "ADMIN") {
+    throw new Error("FORBIDDEN");
   }
   return session;
 }

@@ -25,7 +25,9 @@ import {
   defaultClothingCondition,
   defaultClothingItem,
   defaultClothingMaterials,
+  defaultMaterialsForCategory,
   formatMaterialsForCategory,
+  isBagCategory,
   materialOptionsForCategory,
   maxClothingMaterials,
   normalizeMaterialsForCategory,
@@ -354,7 +356,11 @@ export function ProductCreationWizard({
     setIsSaving(true);
     setMessage(null);
     const formData = new FormData(event.currentTarget);
-    const categorySpecificFields = categoryFieldsFromForm(formData, selectedCategoryFields);
+    const categorySpecificFields = categoryFieldsFromForm(formData, selectedCategoryFields).map((field) =>
+      isBagCategory(selectedClothingCategory) && field.tag === "Material"
+        ? { ...field, value: normalizedMaterials[0] ?? "Натуральная кожа" }
+        : field
+    );
 
     const normalizedGroups = colorGroups
       .map((group) => ({
@@ -492,7 +498,11 @@ export function ProductCreationWizard({
                       clothingCategoryOptions[0];
                     setClothingCategory(next.key);
                     setClothingItem(next.productSubtype);
-                    setMaterials((current) => normalizeMaterialsForCategory(current, null, next));
+                    setMaterials((current) =>
+                      isBagCategory(next)
+                        ? defaultMaterialsForCategory(next)
+                        : normalizeMaterialsForCategory(current, null, next)
+                    );
                     const nextSizes = new Set<string>(
                       sizeOptionsForCategory(next).map((size) => size.value)
                     );

@@ -4,6 +4,14 @@ import { avitoMaterialValues, avitoSizeValues, maxClothingMaterials } from "@/li
 
 const decimalInput = z.union([z.string(), z.number()]).transform((value) => String(value));
 const materialValues = [...avitoMaterialValues] as [string, ...string[]];
+const booleanFilter = z.preprocess(
+  (value) => value === true || value === "true" || value === "1",
+  z.boolean()
+);
+const statusFilter = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  z.nativeEnum(VariantStatus).optional()
+);
 
 export const createProductSchema = z.object({
   title: z.string().min(2),
@@ -21,11 +29,12 @@ export const productListQuerySchema = z.object({
   search: z.string().optional(),
   color: z.string().optional(),
   size: z.string().optional(),
-  status: z.nativeEnum(VariantStatus).optional(),
-  withoutSupplier: z
-    .union([z.literal("true"), z.literal("1"), z.literal(true)])
-    .optional()
-    .transform(Boolean)
+  category: z.string().optional(),
+  supplier: z.string().optional(),
+  status: statusFilter,
+  withoutSupplier: booleanFilter,
+  withoutPhotos: booleanFilter,
+  xmlIssues: booleanFilter
 });
 
 export const createVariantSchema = z.object({

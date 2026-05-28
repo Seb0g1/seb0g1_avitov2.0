@@ -170,7 +170,7 @@ describe("Avito exporters", () => {
         productSubtype: "Сумки",
         categorySpecificFields: [
           { tag: "ApparelType", value: "Сумки" },
-          { tag: "Material", value: "Текстиль" },
+          { tag: "Material", value: "Натуральная кожа" },
           { tag: "Gender", value: "Унисекс" }
         ],
         templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Model", "Color", "ColorName", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "ApparelType", "Material", "Gender", "TargetAudience"],
@@ -182,7 +182,7 @@ describe("Avito exporters", () => {
     expect(xml).toContain("<Size>42</Size>");
     expect(xml).not.toContain("<Apparel>Кроссовки</Apparel>");
     expect(xml).toContain("<Apparel>Сумки</Apparel>");
-    expect(xml).toContain("<Material>Текстиль</Material>");
+    expect(xml).toContain("<Material>Натуральная кожа</Material>");
     expect(xml).not.toContain("<Size>Не указан</Size>");
   });
 

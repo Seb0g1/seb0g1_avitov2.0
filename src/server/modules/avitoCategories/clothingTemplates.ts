@@ -79,7 +79,7 @@ const defaultSubtypeByApparel: Record<string, string> = {
 const commonCategoryFieldDefaults: Record<string, string> = {
   Gender: "Унисекс",
   Hood: "Нет",
-  Material: "Текстиль",
+  Material: "Натуральная кожа",
   WomenJeansModel: "Прямые"
 };
 

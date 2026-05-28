@@ -28,6 +28,13 @@ export function apiError(error: unknown) {
     );
   }
 
+  if (error instanceof Error && error.message === "FORBIDDEN") {
+    return NextResponse.json(
+      { error: "FORBIDDEN", message: "Нет доступа к этому разделу." },
+      { status: 403 }
+    );
+  }
+
   const message = error instanceof Error ? error.message : "Неизвестная ошибка";
   return NextResponse.json(
     { error: "INTERNAL_ERROR", message },

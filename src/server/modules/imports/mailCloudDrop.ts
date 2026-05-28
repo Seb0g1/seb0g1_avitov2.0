@@ -34,6 +34,7 @@ type DropVariantDraft = {
   color: string;
   price: number;
   supplierUrl: string | null;
+  infoText: string | null;
   photos: MailCloudEntry[];
   videos: MailCloudEntry[];
   sourcePath: string;
@@ -47,6 +48,7 @@ type DropProductDraft = {
   productPath: string;
   productFolderName: string;
   info: DropInfo;
+  infoText: string | null;
   variants: DropVariantDraft[];
 };
 
@@ -56,6 +58,47 @@ export type MailCloudDropImportResult = {
   photosImported: number;
   videosImported: number;
   skippedExisting: number;
+  warnings: string[];
+};
+
+export type MailCloudPreviewFile = {
+  name: string;
+  path: string;
+  previewUrl: string;
+  contentType: string | null;
+  contentLength: number | null;
+};
+
+export type MailCloudPreviewProduct = {
+  title: string;
+  date: string;
+  categoryName: string;
+  categoryPath: string;
+  productPath: string;
+  productFolderName: string;
+  info: DropInfo;
+  infoText: string | null;
+  existing: boolean;
+  variants: Array<{
+    title: string;
+    color: string;
+    price: number;
+    supplierUrl: string | null;
+    infoText: string | null;
+    sourcePath: string;
+    photos: MailCloudPreviewFile[];
+    videos: MailCloudPreviewFile[];
+  }>;
+};
+
+export type MailCloudDropPreviewResult = {
+  date: string;
+  products: MailCloudPreviewProduct[];
+  categories: Array<{
+    name: string;
+    path: string;
+    products: MailCloudPreviewProduct[];
+  }>;
   warnings: string[];
 };
 
@@ -360,13 +403,16 @@ async function readInfo(client: MailCloudClient, entries: MailCloudEntry[], owne
   if (!infoEntry) {
     return {
       info: parseDropInfo(""),
+      text: null,
       warnings: [`Нет инфа.txt: ${ownerPath}`]
     };
   }
 
-  const info = parseDropInfo(await client.readText(infoEntry.path));
+  const text = await client.readText(infoEntry.path);
+  const info = parseDropInfo(text);
   return {
     info,
+    text,
     warnings: info.warnings.map((warning) => `${ownerPath}: ${warning}`)
   };
 }
@@ -398,9 +444,8 @@ async function collectProductDraft(
     for (const colorFolder of colorFolders) {
       const colorEntries = await client.listDirectory(colorFolder.path);
       const colorInfoEntry = colorEntries.find(isInfoEntry);
-      const colorInfo = colorInfoEntry
-        ? parseDropInfo(await client.readText(colorInfoEntry.path))
-        : parseDropInfo("");
+      const colorInfoText = colorInfoEntry ? await client.readText(colorInfoEntry.path) : null;
+      const colorInfo = colorInfoText ? parseDropInfo(colorInfoText) : parseDropInfo("");
       const info = mergeInfo(productInfo, colorInfo);
       const photos = sortedImages(colorEntries);
       const videos = sortedVideos(colorEntries);
@@ -417,6 +462,7 @@ async function collectProductDraft(
         color,
         price: info.price ?? 0,
         supplierUrl: info.supplierUrl,
+        infoText: colorInfoText ?? productInfoResult.text,
         photos,
         videos,
         sourcePath: colorFolder.path
@@ -437,6 +483,7 @@ async function collectProductDraft(
       color,
       price: productInfo.price ?? 0,
       supplierUrl: productInfo.supplierUrl,
+      infoText: productInfoResult.text,
       photos,
       videos,
       sourcePath: input.product.path
@@ -452,6 +499,7 @@ async function collectProductDraft(
       productPath: input.product.path,
       productFolderName: input.product.name,
       info: productInfo,
+      infoText: productInfoResult.text,
       variants
     },
     warnings
@@ -500,6 +548,91 @@ async function productExistsByCloudPath(productPath: string) {
     },
     select: { id: true }
   });
+}
+
+export function assertMailCloudPathAllowed(path: string, rootPath = env.MAIL_CLOUD_ROOT_PATH) {
+  const normalizedPath = normalizeCloudPath(path);
+  const normalizedRoot = normalizeCloudPath(rootPath);
+  if (normalizedPath !== normalizedRoot && !normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    throw new Error("Путь Mail Cloud вне разрешённой корневой папки.");
+  }
+  return normalizedPath;
+}
+
+export function mailCloudFileContentType(path: string, fallback?: string | null) {
+  const extension = extensionFromName(path);
+  if (mimeTypeByExtension[extension]) {
+    return mimeTypeByExtension[extension];
+  }
+  if (videoMimeTypeByExtension[extension]) {
+    return videoMimeTypeByExtension[extension];
+  }
+  if (extension === ".txt") {
+    return "text/plain; charset=utf-8";
+  }
+  return fallback ?? "application/octet-stream";
+}
+
+function previewUrl(path: string) {
+  return `/api/imports/mail-cloud-drop/file?path=${encodeURIComponent(path)}`;
+}
+
+function previewFile(entry: MailCloudEntry): MailCloudPreviewFile {
+  return {
+    name: entry.name,
+    path: entry.path,
+    previewUrl: previewUrl(entry.path),
+    contentType: entry.contentType,
+    contentLength: entry.contentLength
+  };
+}
+
+function previewProduct(draft: DropProductDraft, existing: boolean): MailCloudPreviewProduct {
+  return {
+    title: draft.title,
+    date: draft.date,
+    categoryName: draft.categoryName,
+    categoryPath: draft.categoryPath,
+    productPath: draft.productPath,
+    productFolderName: draft.productFolderName,
+    info: draft.info,
+    infoText: draft.infoText,
+    existing,
+    variants: draft.variants.map((variant) => ({
+      title: variant.title,
+      color: variant.color,
+      price: variant.price,
+      supplierUrl: variant.supplierUrl,
+      infoText: variant.infoText,
+      sourcePath: variant.sourcePath,
+      photos: variant.photos.map(previewFile),
+      videos: variant.videos.map(previewFile)
+    }))
+  };
+}
+
+export async function previewMailCloudDrop(
+  date: string,
+  client = createMailCloudClient()
+): Promise<MailCloudDropPreviewResult> {
+  const collected = await collectMailCloudDropProducts({ client, date });
+  const products = await Promise.all(
+    collected.products.map(async (draft) => previewProduct(draft, Boolean(await productExistsByCloudPath(draft.productPath))))
+  );
+  const byCategory = new Map<string, MailCloudPreviewProduct[]>();
+  for (const product of products) {
+    byCategory.set(product.categoryPath, [...(byCategory.get(product.categoryPath) ?? []), product]);
+  }
+  return {
+    date,
+    products,
+    categories: [...byCategory.entries()].map(([path, categoryProducts]) => ({
+      name: categoryProducts[0]?.categoryName ?? nameFromPath(path),
+      path,
+      products: categoryProducts
+    })),
+    warnings: collected.warnings
+  };
 }
 
 async function attachPhotos(variantId: string, photos: MailCloudEntry[], client: MailCloudClient) {
@@ -614,8 +747,16 @@ async function createImportedProduct(draft: DropProductDraft, client: MailCloudC
   return { createdVariants, photosImported, videosImported };
 }
 
-export async function importMailCloudDrop(date: string, client = createMailCloudClient()): Promise<MailCloudDropImportResult> {
+export async function importMailCloudDrop(
+  date: string,
+  client = createMailCloudClient(),
+  options: { productPaths?: string[] } = {}
+): Promise<MailCloudDropImportResult> {
   const collected = await collectMailCloudDropProducts({ client, date });
+  const selectedProductPaths = new Set(options.productPaths?.map((path) => normalizeCloudPath(path)) ?? []);
+  const selectedProducts = selectedProductPaths.size
+    ? collected.products.filter((draft) => selectedProductPaths.has(normalizeCloudPath(draft.productPath)))
+    : collected.products;
   const result: MailCloudDropImportResult = {
     createdProducts: 0,
     createdVariants: 0,
@@ -625,7 +766,7 @@ export async function importMailCloudDrop(date: string, client = createMailCloud
     warnings: [...collected.warnings]
   };
 
-  for (const draft of collected.products) {
+  for (const draft of selectedProducts) {
     if (await productExistsByCloudPath(draft.productPath)) {
       result.skippedExisting += 1;
       continue;
@@ -641,7 +782,10 @@ export async function importMailCloudDrop(date: string, client = createMailCloud
   await prisma.actionLog.create({
     data: {
       message: "Mail Cloud drop imported",
-      context: result as unknown as Prisma.InputJsonValue
+      context: {
+        ...result,
+        selectedProductPaths: [...selectedProductPaths]
+      } as unknown as Prisma.InputJsonValue
     }
   });
 

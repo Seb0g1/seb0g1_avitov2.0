@@ -40,4 +40,16 @@ describe("Avito options", () => {
       "Джинса/деним"
     ]);
   });
+
+  it("uses Avito bag material values for bags", () => {
+    const bags = getClothingCategoryOption("bags");
+    expect(materialOptionsForCategory(bags)).toEqual([
+      "Натуральная кожа",
+      "Искусственная кожа",
+      "Другой"
+    ]);
+    expect(normalizeMaterialsForCategory(["экокожа"], null, bags)).toEqual(["Искусственная кожа"]);
+    expect(normalizeMaterialsForCategory(["полиэстер"], null, bags)).toEqual(["Другой"]);
+    expect(normalizeMaterialsForCategory([], null, bags)).toEqual(["Натуральная кожа"]);
+  });
 });

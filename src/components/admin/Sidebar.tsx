@@ -12,8 +12,8 @@ import {
 } from "lucide-react";
 
 const links = [
-  { href: "/dashboard", label: "Панель", icon: LayoutDashboard },
-  { href: "/catalog", label: "Каталог", icon: Boxes },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/catalog", label: "Товары", icon: Boxes },
   { href: "/jobs", label: "Задачи", icon: Activity },
   { href: "/logs", label: "Журнал", icon: FileCog },
   { href: "/settings", label: "Настройки", icon: Settings }
@@ -34,8 +34,8 @@ export function Sidebar() {
       <div className="brand">
         <div className="brand-mark">A</div>
         <div>
-          <div>Avito Uploader</div>
-          <div className="muted">админ-каталог</div>
+          <div>Avito Studio</div>
+          <div className="sidebar-subtitle">production panel</div>
         </div>
       </div>
       <nav className="nav">
@@ -49,7 +49,7 @@ export function Sidebar() {
             </Link>
           );
         })}
-        <button className="nav-link" type="button" onClick={logout}>
+        <button className="nav-link logout-link" type="button" onClick={logout}>
           <LogOut size={18} aria-hidden />
           Выйти
         </button>

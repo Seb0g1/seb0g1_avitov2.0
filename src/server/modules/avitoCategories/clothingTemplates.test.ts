@@ -64,7 +64,7 @@ describe("Avito clothing XML category templates", () => {
     expect(bag.categorySpecificFields).toEqual([
       { tag: "Model", value: "Сумки" },
       { tag: "ApparelType", value: "Сумки" },
-      { tag: "Material", value: "Текстиль" },
+      { tag: "Material", value: "Натуральная кожа" },
       { tag: "Gender", value: "Унисекс" }
     ]);
     expect(bag.templateFields).not.toContain("Size");
