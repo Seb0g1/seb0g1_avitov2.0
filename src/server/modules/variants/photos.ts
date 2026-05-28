@@ -11,6 +11,20 @@ function extensionFromMimeType(type: string) {
   return type === "image/png" ? ".png" : type === "image/webp" ? ".webp" : ".jpg";
 }
 
+function imageMimeTypeFromName(name?: string) {
+  const extension = path.extname(name ?? "").toLowerCase();
+  if (extension === ".jpg" || extension === ".jpeg" || extension === ".jfif") {
+    return "image/jpeg";
+  }
+  if (extension === ".png") {
+    return "image/png";
+  }
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+  return null;
+}
+
 function videoExtensionFromMimeType(type: string) {
   return type === "video/mp4" ? ".mp4" : ".mov";
 }
@@ -33,6 +47,17 @@ function normalizeVideoMimeType(type: string, sourceName?: string) {
   return videoMimeTypeFromName(sourceName) ?? type;
 }
 
+export function normalizeImageMimeType(type: string, sourceName?: string) {
+  const normalized = type.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (normalized === "image/jpg" || normalized === "image/pjpeg") {
+    return "image/jpeg";
+  }
+  if (allowedTypes.has(normalized)) {
+    return normalized;
+  }
+  return imageMimeTypeFromName(sourceName) ?? normalized;
+}
+
 export async function saveVariantPhotoBuffer(input: {
   variantId: string;
   buffer: Buffer;
@@ -40,11 +65,12 @@ export async function saveVariantPhotoBuffer(input: {
   sourceName?: string;
   logMessage?: string;
 }) {
-  if (!allowedTypes.has(input.mimeType)) {
+  const mimeType = normalizeImageMimeType(input.mimeType, input.sourceName);
+  if (!allowedTypes.has(mimeType)) {
     throw new Error("Поддерживаются только JPG, PNG и WebP изображения.");
   }
 
-  const ext = extensionFromMimeType(input.mimeType);
+  const ext = extensionFromMimeType(mimeType);
   const filename = `${input.variantId}-${Date.now()}-${crypto.randomUUID()}${ext}`;
   const uploadDir = resolveUploadDir();
   await fs.mkdir(uploadDir, { recursive: true });
@@ -78,7 +104,7 @@ export async function saveVariantPhoto(variantId: string, file: File) {
   return saveVariantPhotoBuffer({
     variantId,
     buffer: Buffer.from(await file.arrayBuffer()),
-    mimeType: file.type,
+    mimeType: file.type || imageMimeTypeFromName(file.name) || "",
     sourceName: file.name
   });
 }

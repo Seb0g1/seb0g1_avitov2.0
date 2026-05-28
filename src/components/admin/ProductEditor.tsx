@@ -260,6 +260,7 @@ export function ProductEditor({
     <div className="split">
       <section className="editor-section">
         <form className="grid" onSubmit={updateProduct}>
+          <input type="hidden" name="baseCategory" value={product.baseCategory} />
           <div>
             <p className="eyebrow">Товар Avito</p>
             <h2>Карточка товара</h2>
@@ -283,11 +284,7 @@ export function ProductEditor({
             </datalist>
           </label>
           <label>
-            Категория Avito
-            <input className="field" name="baseCategory" defaultValue={product.baseCategory} required />
-          </label>
-          <label>
-            Категория одежды
+            Категория товара
             <SearchableSelect
               name="clothingCategory"
               value={editingClothingCategory}
@@ -325,7 +322,7 @@ export function ProductEditor({
           </label>
           {editingCategoryFields.map((field) => (
             <label key={`${editingClothingCategory}:${field.tag}`}>
-              {field.tag}
+              {field.label}
               <input
                 className="field"
                 name={`categoryField:${field.tag}`}

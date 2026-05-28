@@ -84,6 +84,17 @@ function uniqueFilled(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+function looksDamagedCategory(value: string) {
+  const text = value.trim();
+  if (text.includes("\uFFFD")) {
+    return true;
+  }
+
+  const mojibakePairs = text.match(/[РС][\u0400-\u045F]/g)?.length ?? 0;
+  const cyrillicChars = text.match(/[\u0400-\u04FF]/g)?.length ?? 0;
+  return mojibakePairs >= 3 && mojibakePairs * 2 >= cyrillicChars;
+}
+
 function formatPrice(value: string) {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) {
@@ -161,7 +172,9 @@ export function ProductCreationWizard({
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [brand, setBrand] = useState("");
-  const [baseCategory, setBaseCategory] = useState(initialCategories[0] ?? "Одежда, обувь, аксессуары");
+  const baseCategory =
+    initialCategories.find((category) => category.trim() && !looksDamagedCategory(category)) ??
+    "Одежда, обувь, аксессуары";
   const [materials, setMaterials] = useState<string[]>([...defaultClothingMaterials]);
   const [adType, setAdType] = useState(defaultAdType);
   const [condition, setCondition] = useState(defaultClothingCondition);
@@ -455,22 +468,7 @@ export function ProductCreationWizard({
                 </datalist>
               </label>
               <label className="span-full">
-                Категория Avito
-                <select
-                  className="select"
-                  value={baseCategory}
-                  onChange={(event) => setBaseCategory(event.target.value)}
-                  required
-                >
-                  {initialCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="span-full">
-                Категория одежды
+                Категория товара
                 <SearchableSelect
                   name="clothingCategory"
                   value={clothingCategory}
@@ -490,7 +488,7 @@ export function ProductCreationWizard({
               </label>
               {selectedCategoryFields.map((field) => (
                 <label key={`${clothingCategory}:${field.tag}`}>
-                  {field.tag}
+                  {field.label}
                   <input
                     className="field"
                     name={`categoryField:${field.tag}`}

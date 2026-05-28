@@ -42,6 +42,22 @@ function stringArray(value: unknown) {
     : [];
 }
 
+function looksDamagedText(value: string) {
+  const text = value.trim();
+  if (text.includes("\uFFFD")) {
+    return true;
+  }
+
+  const mojibakePairs = text.match(/[РС][\u0400-\u045F]/g)?.length ?? 0;
+  const cyrillicChars = text.match(/[\u0400-\u04FF]/g)?.length ?? 0;
+  return mojibakePairs >= 3 && mojibakePairs * 2 >= cyrillicChars;
+}
+
+function usableBaseCategory(value: string) {
+  const text = value.trim();
+  return text.length > 0 && !looksDamagedText(text);
+}
+
 function categoryFields(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -324,7 +340,11 @@ export async function listAvitoCategories() {
     orderBy: { baseCategory: "asc" }
   });
 
-  return uniqueValues([env.DEFAULT_AVITO_CATEGORY, ...categories.map((category) => category.baseCategory)]);
+  return uniqueValues([
+    "Одежда, обувь, аксессуары",
+    env.DEFAULT_AVITO_CATEGORY,
+    ...categories.map((category) => category.baseCategory)
+  ].filter(usableBaseCategory));
 }
 
 export async function regenerateProductDescriptions(id: string) {

@@ -1,5 +1,24 @@
 import type { AvitoCategoryField, ClothingCategoryOption } from "@/lib/avitoOptions";
 
+export type CategoryFormField = AvitoCategoryField & {
+  label: string;
+};
+
+const categoryFieldLabels: Record<string, string> = {
+  ApparelType: "Вид товара",
+  Gender: "Пол",
+  GoodsSubType: "Тип товара",
+  Hood: "Капюшон",
+  Material: "Материал",
+  Model: "Модель",
+  TopType: "Тип верха",
+  WomenJeansModel: "Модель джинсов"
+};
+
+export function categoryFieldLabel(tag: string) {
+  return categoryFieldLabels[tag] ?? tag;
+}
+
 export function normalizedCategoryFields(value: unknown): AvitoCategoryField[] {
   if (!Array.isArray(value)) {
     return [];
@@ -20,7 +39,7 @@ export function categoryFieldsForOption(
   option: ClothingCategoryOption,
   fallbackValue: string,
   currentFields?: unknown
-) {
+): CategoryFormField[] {
   const current = new Map(normalizedCategoryFields(currentFields).map((field) => [field.tag, field.value]));
   const optionFields =
     option.categorySpecificFields ??
@@ -30,7 +49,8 @@ export function categoryFieldsForOption(
 
   return optionFields.map((field) => ({
     tag: field.tag,
-    value: current.get(field.tag) ?? field.value ?? fallbackValue
+    value: current.get(field.tag) ?? field.value ?? fallbackValue,
+    label: categoryFieldLabel(field.tag)
   }));
 }
 
@@ -42,7 +62,7 @@ export function categoryFieldsFromForm(formData: FormData, fields: AvitoCategory
 }
 
 export function categoryOptionDescription(option: ClothingCategoryOption) {
-  const fields = option.categorySpecificFields?.map((field) => field.tag).join(", ");
+  const fields = option.categorySpecificFields?.map((field) => categoryFieldLabel(field.tag)).join(", ");
   return [
     "Личные вещи",
     "Одежда, обувь, аксессуары",

@@ -3,6 +3,7 @@
 import { ChangeEvent, useRef, useState } from "react";
 import { FileCode, Upload } from "lucide-react";
 import type { ClothingCategoryOption } from "@/lib/avitoOptions";
+import { categoryFieldLabel } from "./avitoCategoryForm";
 
 export function ClothingCategoryTemplateImporter({
   initialCategories
@@ -87,9 +88,9 @@ export function ClothingCategoryTemplateImporter({
           <span className="data-chip" key={category.key}>
             {category.goodsType} / {category.label}
             {category.categorySpecificFields?.length
-              ? ` / ${category.categorySpecificFields.map((field) => field.tag).join(", ")}`
+              ? ` / ${category.categorySpecificFields.map((field) => categoryFieldLabel(field.tag)).join(", ")}`
               : category.extraField
-                ? ` / ${category.extraField}`
+                ? ` / ${categoryFieldLabel(category.extraField)}`
                 : ""}
           </span>
         ))}
