@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { apiError, ok } from "@/server/http";
+import { apiError, created } from "@/server/http";
 import { requireSession } from "@/server/modules/auth/session";
-import { importMailCloudDrop } from "@/server/modules/imports/mailCloudDrop";
+import { enqueueMailCloudImport } from "@/server/modules/jobs/service";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     await requireSession();
     const payload = importSchema.parse(await request.json());
-    return ok(await importMailCloudDrop(payload.date));
+    return created({ job: await enqueueMailCloudImport(payload.date) });
   } catch (error) {
     return apiError(error);
   }

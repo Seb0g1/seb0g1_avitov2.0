@@ -27,6 +27,7 @@ enum JobType {
   PUBLICATION
   EXPORT
   STATUS_SYNC
+  MAIL_CLOUD_IMPORT
 }
 
 enum JobStatus {

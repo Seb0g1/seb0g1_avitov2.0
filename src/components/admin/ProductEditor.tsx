@@ -8,6 +8,7 @@ import {
   clothingMaterialOptions,
   clothingCategoryOptions,
   clothingColorOptions,
+  clothingSizeOptions,
   avitoColorSwatch,
   defaultAdType,
   defaultClothingCategory,
@@ -76,6 +77,7 @@ export function ProductEditor({
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [newVariantColor, setNewVariantColor] = useState("Чёрный");
+  const [newVariantSize, setNewVariantSize] = useState("48 (M)");
   const attributes = product.avitoAttributes ?? {};
   const [selectedMaterials, setSelectedMaterials] = useState(() =>
     normalizeClothingMaterials(attributes.materials, attributes.material)
@@ -110,6 +112,11 @@ export function ProductEditor({
     value: color,
     label: color,
     swatch: avitoColorSwatch(color)
+  }));
+  const sizeOptions = clothingSizeOptions.map((size) => ({
+    value: size.value,
+    label: size.value,
+    description: size.label === size.value ? undefined : size.label
   }));
   const multiItemName = String(attributes.multiItemName ?? product.title);
 
@@ -185,6 +192,7 @@ export function ProductEditor({
       await jsonRequest(`/api/products/${product.id}/variants`, "POST", variantBody(formData));
       form.reset();
       setNewVariantColor("Чёрный");
+      setNewVariantSize("48 (M)");
       setMessage("Вариант добавлен.");
       router.refresh();
     } catch (error) {
@@ -418,7 +426,14 @@ export function ProductEditor({
           </label>
           <label>
             Размер
-            <input className="field" name="size" placeholder="48 (M)" required />
+            <SearchableSelect
+              name="size"
+              value={newVariantSize}
+              options={sizeOptions}
+              placeholder="Поиск размера"
+              onChange={setNewVariantSize}
+              required
+            />
           </label>
           <label>
             Цена
@@ -465,6 +480,7 @@ export function ProductEditor({
               onRemovePhoto={removePhoto}
               onRemoveVideo={removeVideo}
               colorOptions={colorOptions}
+              sizeOptions={sizeOptions}
             />
           ))}
         </div>
@@ -482,7 +498,8 @@ function VariantEditor({
   onUploadVideo,
   onRemovePhoto,
   onRemoveVideo,
-  colorOptions
+  colorOptions,
+  sizeOptions
 }: {
   variant: VariantDto;
   onSubmit: (event: FormEvent<HTMLFormElement>, variantId: string) => void;
@@ -493,8 +510,10 @@ function VariantEditor({
   onRemovePhoto: (photoId: string) => void;
   onRemoveVideo: (videoId: string) => void;
   colorOptions: Array<{ value: string; label: string; swatch?: string }>;
+  sizeOptions: Array<{ value: string; label: string; description?: string }>;
 }) {
   const [editingColor, setEditingColor] = useState(variant.color);
+  const [editingSize, setEditingSize] = useState(variant.size);
 
   function drop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
@@ -534,7 +553,18 @@ function VariantEditor({
         </label>
         <label>
           Размер
-          <input className="field" name="size" defaultValue={variant.size} required />
+          <SearchableSelect
+            name="size"
+            value={editingSize}
+            options={
+              sizeOptions.some((option) => option.value === editingSize)
+                ? sizeOptions
+                : [{ value: editingSize, label: editingSize }, ...sizeOptions]
+            }
+            placeholder="Поиск размера"
+            onChange={setEditingSize}
+            required
+          />
         </label>
         <label>
           Цена

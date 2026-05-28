@@ -269,12 +269,9 @@ export function CatalogClient({
         body: JSON.stringify({ date })
       });
       const body = (await response.json().catch(() => null)) as {
-        createdProducts?: number;
-        createdVariants?: number;
-        photosImported?: number;
-        videosImported?: number;
-        skippedExisting?: number;
-        warnings?: string[];
+        job?: {
+          id: string;
+        };
         message?: string;
       } | null;
 
@@ -283,11 +280,8 @@ export function CatalogClient({
         return;
       }
 
-      const warnings = body?.warnings?.length
-        ? ` Предупреждения: ${body.warnings.slice(0, 3).join("; ")}${body.warnings.length > 3 ? "..." : ""}`
-        : "";
       setMessage(
-        `Mail Cloud: создано товаров ${body?.createdProducts ?? 0}, вариантов ${body?.createdVariants ?? 0}, фото ${body?.photosImported ?? 0}, видео ${body?.videosImported ?? 0}, пропущено ${body?.skippedExisting ?? 0}.${warnings}`
+        `Mail Cloud: импорт поставлен в очередь${body?.job?.id ? `, задача ${body.job.id.slice(0, 10)}` : ""}. Результат появится в разделе “Задачи”.`
       );
       startTransition(() => router.refresh());
     } finally {

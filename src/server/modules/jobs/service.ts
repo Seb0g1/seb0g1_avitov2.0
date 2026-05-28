@@ -1,6 +1,6 @@
 import { JobType, PublicationMode } from "@prisma/client";
 import { prisma } from "@/server/db";
-import { processPublicationJob, processStatusSyncJob } from "./handlers";
+import { processMailCloudImportJob, processPublicationJob, processStatusSyncJob } from "./handlers";
 
 export async function enqueuePublication(mode: PublicationMode, variantIds: string[]) {
   const dbJob = await prisma.publicationJob.create({
@@ -47,6 +47,35 @@ export async function enqueueStatusSync(reportText?: string) {
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       await processStatusSyncJob({ jobId: dbJob.id, reportText });
+    } else {
+      throw error;
+    }
+  }
+
+  return dbJob;
+}
+
+export async function enqueueMailCloudImport(date: string) {
+  const dbJob = await prisma.publicationJob.create({
+    data: {
+      type: JobType.MAIL_CLOUD_IMPORT,
+      payload: { date }
+    }
+  });
+
+  try {
+    const { defaultJobOptions, mailCloudImportQueue } = await import("./queues");
+    await mailCloudImportQueue.add(
+      "import-mail-cloud-drop",
+      { jobId: dbJob.id, date },
+      {
+        ...defaultJobOptions,
+        attempts: 1
+      }
+    );
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      await processMailCloudImportJob({ jobId: dbJob.id, date });
     } else {
       throw error;
     }

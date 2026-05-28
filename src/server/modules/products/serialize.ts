@@ -97,6 +97,7 @@ export function serializeJob(job: PublicationJob): JobDto {
     status: job.status,
     mode: job.mode,
     attempts: job.attempts,
+    result: job.result,
     error: job.error,
     queuedAt: job.queuedAt.toISOString(),
     completedAt: job.completedAt?.toISOString() ?? null

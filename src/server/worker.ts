@@ -1,9 +1,9 @@
 import "@/server/loadEnv";
 import { Worker } from "bullmq";
 import { getBullMqConnection } from "@/server/redis";
-import { processPublicationJob, processStatusSyncJob } from "@/server/modules/jobs/handlers";
+import { processMailCloudImportJob, processPublicationJob, processStatusSyncJob } from "@/server/modules/jobs/handlers";
 import { scheduleStatusSync } from "@/server/modules/jobs/service";
-import type { PublicationPayload, StatusSyncPayload } from "@/server/modules/jobs/types";
+import type { MailCloudImportPayload, PublicationPayload, StatusSyncPayload } from "@/server/modules/jobs/types";
 
 async function main() {
   await scheduleStatusSync();
@@ -20,7 +20,16 @@ async function main() {
     { connection: getBullMqConnection() }
   );
 
-  for (const worker of [publicationWorker, statusWorker]) {
+  const mailCloudImportWorker = new Worker<MailCloudImportPayload>(
+    "mailCloudImport",
+    async (job) => processMailCloudImportJob(job.data),
+    {
+      connection: getBullMqConnection(),
+      concurrency: 1
+    }
+  );
+
+  for (const worker of [publicationWorker, statusWorker, mailCloudImportWorker]) {
     worker.on("failed", (job, error) => {
       console.error(`Job ${job?.name ?? "unknown"} failed:`, error.message);
     });

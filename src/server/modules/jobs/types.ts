@@ -10,3 +10,8 @@ export type StatusSyncPayload = {
   jobId?: string;
   reportText?: string;
 };
+
+export type MailCloudImportPayload = {
+  jobId: string;
+  date: string;
+};

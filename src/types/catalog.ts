@@ -101,6 +101,7 @@ export type JobDto = {
   status: JobStatus;
   mode: PublicationMode | null;
   attempts: number;
+  result: unknown | null;
   error: string | null;
   queuedAt: string;
   completedAt: string | null;

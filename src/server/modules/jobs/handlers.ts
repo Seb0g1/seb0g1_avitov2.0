@@ -3,8 +3,9 @@ import { prisma } from "@/server/db";
 import { createAvitoItem } from "@/server/modules/avitoApi/items";
 import { generateAvitoCsvExport, generateAvitoXmlExport } from "@/server/modules/exports/service";
 import { getFeedRows } from "@/server/modules/exports/feedRows";
+import { importMailCloudDrop } from "@/server/modules/imports/mailCloudDrop";
 import { syncVariantStatuses } from "./statusSync";
-import type { PublicationPayload, StatusSyncPayload } from "./types";
+import type { MailCloudImportPayload, PublicationPayload, StatusSyncPayload } from "./types";
 
 export async function processPublicationJob(payload: PublicationPayload) {
   await prisma.publicationJob.update({
@@ -149,6 +150,43 @@ export async function processStatusSyncJob(payload: StatusSyncPayload) {
     });
     await prisma.errorLog.create({
       data: { source: "statusSyncJob", message, details: { jobId: dbJob.id } }
+    });
+    throw error;
+  }
+}
+
+export async function processMailCloudImportJob(payload: MailCloudImportPayload) {
+  await prisma.publicationJob.update({
+    where: { id: payload.jobId },
+    data: { status: JobStatus.RUNNING, startedAt: new Date(), attempts: { increment: 1 } }
+  });
+
+  try {
+    const result = await importMailCloudDrop(payload.date);
+    await prisma.publicationJob.update({
+      where: { id: payload.jobId },
+      data: {
+        status: JobStatus.COMPLETED,
+        result: result as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+        error: null
+      }
+    });
+    await prisma.actionLog.create({
+      data: {
+        message: "Mail Cloud import job completed",
+        context: { jobId: payload.jobId, date: payload.date, result } as Prisma.InputJsonValue
+      }
+    });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Mail Cloud import error";
+    await prisma.publicationJob.update({
+      where: { id: payload.jobId },
+      data: { status: JobStatus.FAILED, error: message, completedAt: new Date() }
+    });
+    await prisma.errorLog.create({
+      data: { source: "mailCloudImportJob", message, details: { jobId: payload.jobId, date: payload.date } }
     });
     throw error;
   }
