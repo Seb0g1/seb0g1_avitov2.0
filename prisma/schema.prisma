@@ -106,6 +106,7 @@ model Variant {
   updatedAt       DateTime      @updatedAt
   product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
   photos          Photo[]
+  videos          Video[]
 
   @@index([productId])
   @@index([status])
@@ -115,6 +116,18 @@ model Variant {
 }
 
 model Photo {
+  id        String   @id @default(cuid())
+  variantId String
+  path      String
+  publicUrl String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  variant   Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId])
+}
+
+model Video {
   id        String   @id @default(cuid())
   variantId String
   path      String

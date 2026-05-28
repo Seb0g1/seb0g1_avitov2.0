@@ -103,7 +103,7 @@ export async function listProducts(input: unknown) {
     include: {
       variants: {
         where: Object.keys(variantWhere).length ? variantWhere : undefined,
-        include: { photos: { orderBy: { sortOrder: "asc" } } },
+        include: { photos: { orderBy: { sortOrder: "asc" } }, videos: { orderBy: { sortOrder: "asc" } } },
         orderBy: { updatedAt: "desc" }
       }
     },
@@ -116,7 +116,7 @@ export async function getProduct(id: string) {
     where: { id },
     include: {
       variants: {
-        include: { photos: { orderBy: { sortOrder: "asc" } } },
+        include: { photos: { orderBy: { sortOrder: "asc" } }, videos: { orderBy: { sortOrder: "asc" } } },
         orderBy: { createdAt: "asc" }
       }
     }
@@ -224,7 +224,7 @@ export async function createProductWithVariants(input: unknown) {
       },
       include: {
         variants: {
-          include: { photos: { orderBy: { sortOrder: "asc" } } },
+          include: { photos: { orderBy: { sortOrder: "asc" } }, videos: { orderBy: { sortOrder: "asc" } } },
           orderBy: { createdAt: "asc" }
         }
       }
@@ -386,7 +386,7 @@ export async function createVariant(productId: string, input: unknown) {
   const { supplierUrl, supplierName, ...variantData } = data;
   const variant = await prisma.variant.create({
     data: { ...variantData, ...supplierToPrismaData({ supplierUrl, supplierName }), productId },
-    include: { photos: true }
+    include: { photos: true, videos: true }
   });
   await prisma.actionLog.create({
     data: { message: "Variant created", context: { productId, variantId: variant.id } }
@@ -401,7 +401,7 @@ export async function updateVariant(id: string, input: unknown) {
   const variant = await prisma.variant.update({
     where: { id },
     data: { ...variantData, ...supplierData },
-    include: { photos: { orderBy: { sortOrder: "asc" } } }
+    include: { photos: { orderBy: { sortOrder: "asc" } }, videos: { orderBy: { sortOrder: "asc" } } }
   });
   await prisma.actionLog.create({
     data: { message: "Variant updated", context: { variantId: variant.id } }
@@ -424,7 +424,7 @@ export async function deleteVariant(id: string) {
 export async function duplicateVariant(id: string) {
   const variant = await prisma.variant.findUniqueOrThrow({
     where: { id },
-    include: { photos: { orderBy: { sortOrder: "asc" } } }
+    include: { photos: { orderBy: { sortOrder: "asc" } }, videos: { orderBy: { sortOrder: "asc" } } }
   });
 
   const duplicated = await prisma.variant.create({
@@ -449,9 +449,16 @@ export async function duplicateVariant(id: string) {
           publicUrl: photo.publicUrl,
           sortOrder: photo.sortOrder
         }))
+      },
+      videos: {
+        create: variant.videos.map((video) => ({
+          path: video.path,
+          publicUrl: video.publicUrl,
+          sortOrder: video.sortOrder
+        }))
       }
     },
-    include: { photos: { orderBy: { sortOrder: "asc" } } }
+    include: { photos: { orderBy: { sortOrder: "asc" } }, videos: { orderBy: { sortOrder: "asc" } } }
   });
 
   await prisma.actionLog.create({

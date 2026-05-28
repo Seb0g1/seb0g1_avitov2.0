@@ -37,6 +37,7 @@ const rows: FeedRow[] = [
     updatedAt: new Date("2026-05-27T10:00:00Z"),
     avitoItemId: null,
     photos: ["https://example.com/black-m.jpg"],
+    videoUrl: null,
     region: "Москва",
     city: "Москва",
     address: "Россия, Москва, Тверская улица, 1",
@@ -79,6 +80,7 @@ const rows: FeedRow[] = [
     updatedAt: new Date("2026-05-27T10:00:00Z"),
     avitoItemId: null,
     photos: ["https://example.com/grey-l.jpg"],
+    videoUrl: "https://example.com/grey-l.mov",
     region: "Москва",
     city: "Москва",
     address: "Россия, Москва, Тверская улица, 1",
@@ -109,6 +111,7 @@ describe("Avito exporters", () => {
     expect(xml).toContain("<Size>50 (L)</Size>");
     expect(xml).toContain("<MultiItem>Да</MultiItem>");
     expect(xml).toContain("<MultiName>Nike Stussy</MultiName>");
+    expect(xml).toContain("<VideoFileURL>https://example.com/grey-l.mov</VideoFileURL>");
     expect(xml).not.toContain("����");
     expect(xml).not.toContain("Рњ");
   });

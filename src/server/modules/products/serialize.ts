@@ -1,4 +1,4 @@
-import type { ActionLog, ErrorLog, Product, PublicationJob, Variant, Photo } from "@prisma/client";
+import type { ActionLog, ErrorLog, Product, PublicationJob, Variant, Photo, Video } from "@prisma/client";
 import {
   ownerSupplier,
   resolveEffectiveSupplier,
@@ -7,7 +7,7 @@ import {
 import { normalizeClothingMaterials } from "@/server/modules/products/clothing";
 import type { ActionLogDto, ErrorLogDto, JobDto, ProductDto, SupplierDto, VariantDto } from "@/types/catalog";
 
-type VariantWithPhotos = Variant & { photos: Photo[] };
+type VariantWithPhotos = Variant & { photos: Photo[]; videos: Video[] };
 type ProductWithVariants = Product & { variants: VariantWithPhotos[] };
 
 function serializeSupplier(supplier: SupplierLink | null): SupplierDto | null {
@@ -53,6 +53,11 @@ export function serializeVariant(variant: VariantWithPhotos, product?: Product):
       id: photo.id,
       publicUrl: photo.publicUrl,
       sortOrder: photo.sortOrder
+    })),
+    videos: variant.videos.map((video) => ({
+      id: video.id,
+      publicUrl: video.publicUrl,
+      sortOrder: video.sortOrder
     }))
   };
 }

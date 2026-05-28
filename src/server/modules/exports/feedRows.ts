@@ -43,6 +43,7 @@ export type FeedRow = {
   updatedAt: Date;
   avitoItemId?: string | null;
   photos: string[];
+  videoUrl: string | null;
   region: string;
   city: string;
   address: string;
@@ -256,7 +257,8 @@ export async function getFeedRowsWithDiagnostics(options?: {
           }
         }
       },
-      photos: { orderBy: { sortOrder: "asc" } }
+      photos: { orderBy: { sortOrder: "asc" } },
+      videos: { orderBy: { sortOrder: "asc" } }
     },
     orderBy: [{ product: { title: "asc" } }, { color: "asc" }, { size: "asc" }]
   });
@@ -279,6 +281,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const photos = variant.photos
       .map((photo) => photo.publicUrl)
       .filter((photo) => photo && !hasDamagedText(photo));
+    const videoUrl = variant.videos.find((video) => video.publicUrl && !hasDamagedText(video.publicUrl))?.publicUrl ?? null;
     const price = Number(variant.price);
     const reasons = getFeedValidationReasons({
       size: variant.size,
@@ -398,6 +401,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       updatedAt: variant.updatedAt,
       avitoItemId: variant.avitoItemId,
       photos,
+      videoUrl,
       region: geo.region,
       city: geo.city,
       address: geo.address,

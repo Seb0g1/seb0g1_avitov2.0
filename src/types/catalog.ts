@@ -6,6 +6,12 @@ export type PhotoDto = {
   sortOrder: number;
 };
 
+export type VideoDto = {
+  id: string;
+  publicUrl: string;
+  sortOrder: number;
+};
+
 export type SupplierDto = {
   url: string | null;
   name: string | null;
@@ -33,6 +39,7 @@ export type VariantDto = {
   supplier: SupplierDto | null;
   effectiveSupplier: SupplierDto | null;
   photos: PhotoDto[];
+  videos: VideoDto[];
 };
 
 export type ProductDto = {

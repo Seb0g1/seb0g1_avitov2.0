@@ -104,6 +104,7 @@ describe("Mail Cloud drop import parsing", () => {
         ],
         [blackPath]: [
           file(`${blackPath}/01.jpg`),
+          file(`${blackPath}/review.mov`, "video/quicktime"),
           file(`${blackPath}/инфа.txt`, "text/plain")
         ],
         [whitePath]: [file(`${whitePath}/01.webp`, "image/webp")]
@@ -123,7 +124,12 @@ describe("Mail Cloud drop import parsing", () => {
       productPath
     });
     expect(result.products[0].variants).toEqual([
-      expect.objectContaining({ color: "Чёрный", price: 5999, photos: [expect.objectContaining({ name: "01.jpg" })] }),
+      expect.objectContaining({
+        color: "Чёрный",
+        price: 5999,
+        photos: [expect.objectContaining({ name: "01.jpg" })],
+        videos: [expect.objectContaining({ name: "review.mov" })]
+      }),
       expect.objectContaining({ color: "Белый", price: 5499, photos: [expect.objectContaining({ name: "01.webp" })] })
     ]);
   });

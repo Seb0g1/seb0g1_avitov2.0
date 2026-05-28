@@ -30,7 +30,8 @@ const product: ProductDto = {
       updatedAt: "2026-05-27T10:00:00.000Z",
       supplier: null,
       effectiveSupplier: null,
-      photos: [{ id: "photo-1", publicUrl: "https://example.com/1.jpg", sortOrder: 0 }]
+      photos: [{ id: "photo-1", publicUrl: "https://example.com/1.jpg", sortOrder: 0 }],
+      videos: [{ id: "video-1", publicUrl: "https://example.com/1.mov", sortOrder: 0 }]
     },
     {
       id: "variant-black-l",
@@ -49,7 +50,8 @@ const product: ProductDto = {
       updatedAt: "2026-05-27T10:00:00.000Z",
       supplier: null,
       effectiveSupplier: null,
-      photos: []
+      photos: [],
+      videos: []
     }
   ]
 };
@@ -64,6 +66,7 @@ describe("catalog row aggregation", () => {
     expect(row.maxPrice).toBe(2499);
     expect(row.totalQuantity).toBe(5);
     expect(row.photoCount).toBe(1);
+    expect(row.videoCount).toBe(1);
     expect(row.avitoItemIds).toEqual(["111", "222"]);
     expect(row.statusCounts).toContainEqual({ status: "PUBLISHED", count: 1 });
   });

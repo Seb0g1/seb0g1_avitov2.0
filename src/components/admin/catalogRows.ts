@@ -38,6 +38,7 @@ export type CatalogProductRow = {
   maxPrice: number;
   totalQuantity: number;
   photoCount: number;
+  videoCount: number;
   avitoItemIds: string[];
   statusCounts: Array<{ status: VariantStatus; count: number }>;
   supplier: SupplierDto | null;
@@ -65,6 +66,7 @@ export function buildCatalogProductRows(products: ProductDto[]): CatalogProductR
       maxPrice: prices.length ? Math.max(...prices) : 0,
       totalQuantity: variants.reduce((sum, variant) => sum + variant.quantity, 0),
       photoCount: variants.reduce((sum, variant) => sum + variant.photos.length, 0),
+      videoCount: variants.reduce((sum, variant) => sum + variant.videos.length, 0),
       avitoItemIds: uniqueFilled(variants.map((variant) => variant.avitoItemId)),
       statusCounts,
       supplier: resolveRowSupplier(product, variants),

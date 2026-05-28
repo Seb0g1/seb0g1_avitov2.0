@@ -7,8 +7,11 @@ type Params = {
 };
 
 function contentType(filename: string) {
-  if (filename.endsWith(".png")) return "image/png";
-  if (filename.endsWith(".webp")) return "image/webp";
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".mov")) return "video/quicktime";
+  if (lower.endsWith(".mp4")) return "video/mp4";
   return "image/jpeg";
 }
 

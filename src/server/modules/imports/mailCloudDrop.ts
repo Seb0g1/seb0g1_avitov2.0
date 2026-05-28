@@ -4,7 +4,7 @@ import { normalizeAvitoColor } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import { supplierToPrismaData } from "@/server/modules/suppliers/moysklad";
-import { saveVariantPhotoBuffer } from "@/server/modules/variants/photos";
+import { saveVariantPhotoBuffer, saveVariantVideoBuffer } from "@/server/modules/variants/photos";
 
 type WebDavObject = Record<string, unknown>;
 
@@ -35,6 +35,7 @@ type DropVariantDraft = {
   price: number;
   supplierUrl: string | null;
   photos: MailCloudEntry[];
+  videos: MailCloudEntry[];
   sourcePath: string;
 };
 
@@ -53,6 +54,7 @@ export type MailCloudDropImportResult = {
   createdProducts: number;
   createdVariants: number;
   photosImported: number;
+  videosImported: number;
   skippedExisting: number;
   warnings: string[];
 };
@@ -60,11 +62,16 @@ export type MailCloudDropImportResult = {
 const infoFileName = "инфа.txt";
 const unknownValue = "Не указан";
 const supportedImageExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+const supportedVideoExtensions = new Set([".mov", ".mp4"]);
 const mimeTypeByExtension: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",
   ".webp": "image/webp"
+};
+const videoMimeTypeByExtension: Record<string, string> = {
+  ".mov": "video/quicktime",
+  ".mp4": "video/mp4"
 };
 
 function asRecord(value: unknown): WebDavObject {
@@ -143,6 +150,14 @@ function imageMimeType(entry: MailCloudEntry) {
   return mimeTypeByExtension[extension] ?? null;
 }
 
+function videoMimeType(entry: MailCloudEntry) {
+  if (entry.contentType?.startsWith("video/")) {
+    return entry.contentType;
+  }
+  const extension = extensionFromName(entry.name);
+  return videoMimeTypeByExtension[extension] ?? null;
+}
+
 function extensionFromName(name: string) {
   const match = name.toLowerCase().match(/\.[^.]+$/);
   return match?.[0] ?? "";
@@ -152,6 +167,10 @@ function isImageEntry(entry: MailCloudEntry) {
   return !entry.isDirectory && supportedImageExtensions.has(extensionFromName(entry.name));
 }
 
+function isVideoEntry(entry: MailCloudEntry) {
+  return !entry.isDirectory && supportedVideoExtensions.has(extensionFromName(entry.name));
+}
+
 function isInfoEntry(entry: MailCloudEntry) {
   return !entry.isDirectory && entry.name.toLowerCase() === infoFileName;
 }
@@ -159,6 +178,12 @@ function isInfoEntry(entry: MailCloudEntry) {
 function sortedImages(entries: MailCloudEntry[]) {
   return entries
     .filter(isImageEntry)
+    .sort((a, b) => a.name.localeCompare(b.name, "ru", { numeric: true, sensitivity: "base" }));
+}
+
+function sortedVideos(entries: MailCloudEntry[]) {
+  return entries
+    .filter(isVideoEntry)
     .sort((a, b) => a.name.localeCompare(b.name, "ru", { numeric: true, sensitivity: "base" }));
 }
 
@@ -352,6 +377,7 @@ async function collectProductDraft(
         : parseDropInfo("");
       const info = mergeInfo(productInfo, colorInfo);
       const photos = sortedImages(colorEntries);
+      const videos = sortedVideos(colorEntries);
       const color = variantColor(info, colorFolder.name);
       if (!info.price) {
         warnings.push(`Нет цены: ${colorFolder.path}`);
@@ -366,11 +392,13 @@ async function collectProductDraft(
         price: info.price ?? 0,
         supplierUrl: info.supplierUrl,
         photos,
+        videos,
         sourcePath: colorFolder.path
       });
     }
   } else {
     const photos = sortedImages(productEntries);
+    const videos = sortedVideos(productEntries);
     const color = variantColor(productInfo);
     if (!productInfo.price) {
       warnings.push(`Нет цены: ${input.product.path}`);
@@ -384,6 +412,7 @@ async function collectProductDraft(
       price: productInfo.price ?? 0,
       supplierUrl: productInfo.supplierUrl,
       photos,
+      videos,
       sourcePath: input.product.path
     });
   }
@@ -469,6 +498,28 @@ async function attachPhotos(variantId: string, photos: MailCloudEntry[], client:
   return imported;
 }
 
+async function attachVideos(variantId: string, videos: MailCloudEntry[], client: MailCloudClient) {
+  let imported = 0;
+  for (const video of videos) {
+    const downloaded = await client.readFile(video.path);
+    const mimeType = downloaded.mimeType?.startsWith("video/")
+      ? downloaded.mimeType
+      : videoMimeType(video);
+    if (!mimeType) {
+      continue;
+    }
+    await saveVariantVideoBuffer({
+      variantId,
+      buffer: downloaded.buffer,
+      mimeType,
+      sourceName: video.name,
+      logMessage: "Variant video imported from Mail Cloud"
+    });
+    imported += 1;
+  }
+  return imported;
+}
+
 async function createImportedProduct(draft: DropProductDraft, client: MailCloudClient) {
   const productSupplierData = supplierToPrismaData({
     supplierUrl: draft.info.supplierUrl,
@@ -497,6 +548,7 @@ async function createImportedProduct(draft: DropProductDraft, client: MailCloudC
 
   let createdVariants = 0;
   let photosImported = 0;
+  let videosImported = 0;
   for (const variantDraft of draft.variants) {
     const variantSupplierData = supplierToPrismaData({
       supplierUrl: variantDraft.supplierUrl,
@@ -517,6 +569,7 @@ async function createImportedProduct(draft: DropProductDraft, client: MailCloudC
     });
     createdVariants += 1;
     photosImported += await attachPhotos(variant.id, variantDraft.photos, client);
+    videosImported += await attachVideos(variant.id, variantDraft.videos, client);
   }
 
   await prisma.actionLog.create({
@@ -526,12 +579,13 @@ async function createImportedProduct(draft: DropProductDraft, client: MailCloudC
         productId: product.id,
         productPath: draft.productPath,
         variantCount: createdVariants,
-        photosImported
+        photosImported,
+        videosImported
       }
     }
   });
 
-  return { createdVariants, photosImported };
+  return { createdVariants, photosImported, videosImported };
 }
 
 export async function importMailCloudDrop(date: string, client = createMailCloudClient()): Promise<MailCloudDropImportResult> {
@@ -540,6 +594,7 @@ export async function importMailCloudDrop(date: string, client = createMailCloud
     createdProducts: 0,
     createdVariants: 0,
     photosImported: 0,
+    videosImported: 0,
     skippedExisting: 0,
     warnings: [...collected.warnings]
   };
@@ -554,6 +609,7 @@ export async function importMailCloudDrop(date: string, client = createMailCloud
     result.createdProducts += 1;
     result.createdVariants += created.createdVariants;
     result.photosImported += created.photosImported;
+    result.videosImported += created.videosImported;
   }
 
   await prisma.actionLog.create({

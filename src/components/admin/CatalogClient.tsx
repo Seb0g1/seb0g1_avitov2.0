@@ -272,6 +272,7 @@ export function CatalogClient({
         createdProducts?: number;
         createdVariants?: number;
         photosImported?: number;
+        videosImported?: number;
         skippedExisting?: number;
         warnings?: string[];
         message?: string;
@@ -286,7 +287,7 @@ export function CatalogClient({
         ? ` Предупреждения: ${body.warnings.slice(0, 3).join("; ")}${body.warnings.length > 3 ? "..." : ""}`
         : "";
       setMessage(
-        `Mail Cloud: создано товаров ${body?.createdProducts ?? 0}, вариантов ${body?.createdVariants ?? 0}, фото ${body?.photosImported ?? 0}, пропущено ${body?.skippedExisting ?? 0}.${warnings}`
+        `Mail Cloud: создано товаров ${body?.createdProducts ?? 0}, вариантов ${body?.createdVariants ?? 0}, фото ${body?.photosImported ?? 0}, видео ${body?.videosImported ?? 0}, пропущено ${body?.skippedExisting ?? 0}.${warnings}`
       );
       startTransition(() => router.refresh());
     } finally {
@@ -495,6 +496,7 @@ export function CatalogClient({
                 </td>
                 <td>
                   <div>Фото: {row.photoCount}</div>
+                  <div>Видео: {row.videoCount}</div>
                   <div className="muted">Avito ID: {row.avitoItemIds.length}</div>
                 </td>
                 <td>

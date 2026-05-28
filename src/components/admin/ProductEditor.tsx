@@ -3,7 +3,7 @@
 import { DragEvent, FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { VariantStatus } from "@prisma/client";
-import { Copy, ExternalLink, Save, Sparkles, Trash2, Upload } from "lucide-react";
+import { Copy, ExternalLink, Film, Save, Sparkles, Trash2, Upload } from "lucide-react";
 import {
   clothingMaterialOptions,
   clothingCategoryOptions,
@@ -194,9 +194,26 @@ export function ProductEditor({
     router.refresh();
   }
 
+  async function uploadVideos(variantId: string, files: FileList | File[]) {
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append("videos", file));
+    const response = await fetch(`/api/variants/${variantId}/videos`, {
+      method: "POST",
+      body: formData
+    });
+    setMessage(response.ok ? "Видео загружено." : "Не удалось загрузить видео.");
+    router.refresh();
+  }
+
   async function removePhoto(photoId: string) {
     const response = await fetch(`/api/photos/${photoId}`, { method: "DELETE" });
     setMessage(response.ok ? "Фото удалено." : "Не удалось удалить фото.");
+    router.refresh();
+  }
+
+  async function removeVideo(videoId: string) {
+    const response = await fetch(`/api/videos/${videoId}`, { method: "DELETE" });
+    setMessage(response.ok ? "Видео удалено." : "Не удалось удалить видео.");
     router.refresh();
   }
 
@@ -401,7 +418,9 @@ export function ProductEditor({
               onDuplicate={duplicateVariant}
               onRemove={removeVariant}
               onUpload={uploadPhotos}
+              onUploadVideo={uploadVideos}
               onRemovePhoto={removePhoto}
+              onRemoveVideo={removeVideo}
             />
           ))}
         </div>
@@ -416,19 +435,30 @@ function VariantEditor({
   onDuplicate,
   onRemove,
   onUpload,
-  onRemovePhoto
+  onUploadVideo,
+  onRemovePhoto,
+  onRemoveVideo
 }: {
   variant: VariantDto;
   onSubmit: (event: FormEvent<HTMLFormElement>, variantId: string) => void;
   onDuplicate: (variantId: string) => void;
   onRemove: (variantId: string) => void;
   onUpload: (variantId: string, files: FileList | File[]) => void;
+  onUploadVideo: (variantId: string, files: FileList | File[]) => void;
   onRemovePhoto: (photoId: string) => void;
+  onRemoveVideo: (videoId: string) => void;
 }) {
   function drop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     if (event.dataTransfer.files.length > 0) {
       onUpload(variant.id, event.dataTransfer.files);
+    }
+  }
+
+  function dropVideo(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (event.dataTransfer.files.length > 0) {
+      onUploadVideo(variant.id, event.dataTransfer.files);
     }
   }
 
@@ -570,6 +600,49 @@ function VariantEditor({
           </span>
         ))}
       </div>
+      {variant.videos.length > 0 ? (
+        <div className="photo-strip">
+          {variant.videos.map((video) => (
+            <span key={video.id} style={{ position: "relative" }}>
+              <video
+                className="photo-thumb"
+                src={video.publicUrl}
+                controls
+                muted
+                preload="metadata"
+              />
+              <button
+                className="icon-button"
+                type="button"
+                onClick={() => onRemoveVideo(video.id)}
+                title="Удалить видео"
+                style={{ position: "absolute", right: -6, top: -6, width: 28, height: 28, minHeight: 28 }}
+              >
+                <Trash2 size={14} aria-hidden />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <label
+        className="dropzone"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={dropVideo}
+      >
+        <Film size={22} aria-hidden />
+        Перетащите MOV/MP4 видео или выберите файл
+        <input
+          type="file"
+          multiple
+          accept="video/quicktime,video/mp4,.mov,.mp4"
+          hidden
+          onChange={(event) => {
+            if (event.currentTarget.files) {
+              onUploadVideo(variant.id, event.currentTarget.files);
+            }
+          }}
+        />
+      </label>
       {variant.lastError ? <div className="status ERROR">{variant.lastError}</div> : null}
     </div>
   );
