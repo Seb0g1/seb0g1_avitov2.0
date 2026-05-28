@@ -7,6 +7,7 @@ import {
   normalizeApparelForFeed,
   normalizeFeedBrand,
   normalizeFeedColor,
+  normalizedCategorySpecificFields,
   normalizeFeedSize,
   normalizeFeedSizeForCategory
 } from "./feedRows";
@@ -69,6 +70,24 @@ describe("feed row validation", () => {
 
     expect(outerwear).toBeDefined();
     expect(normalizeApparelForFeed("Лёгкие куртки и ветровки", outerwear!)).toBe("Верхняя одежда");
+  });
+
+  it("normalizes legacy outerwear ApparelType values", () => {
+    const outerwear = clothingCategoryOptions.find((option) => option.key === "women-light-jackets")!;
+    const fields = normalizedCategorySpecificFields({
+      configured: [
+        { tag: "ApparelType", value: "Лёгкая куртка" },
+        { tag: "Hood", value: "Да" }
+      ],
+      option: outerwear,
+      category: "Одежда, обувь, аксессуары",
+      goodsType: "Мужская одежда",
+      clothingItem: "Верхняя одежда",
+      productSubtype: "Лёгкая куртка"
+    });
+
+    expect(fields).toContainEqual({ tag: "ApparelType", value: "Лёгкие куртки и ветровки" });
+    expect(fields).toContainEqual({ tag: "Hood", value: "Да" });
   });
 
   it("skips rows without photos", () => {

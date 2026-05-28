@@ -485,9 +485,9 @@ export const clothingCategoryOptions: readonly ClothingCategoryOption[] = [
     apparel: "Лёгкие куртки и ветровки",
     productSubtype: "Лёгкая куртка",
     extraField: "ApparelType",
-    extraValue: "Лёгкая куртка",
+    extraValue: "Лёгкие куртки и ветровки",
     categorySpecificFields: [
-      { tag: "ApparelType", value: "Лёгкая куртка" },
+      { tag: "ApparelType", value: "Лёгкие куртки и ветровки" },
       { tag: "Hood", value: "Нет" }
     ],
     templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "ApparelType", "Size", "TargetAudience", "Hood"]

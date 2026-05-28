@@ -370,7 +370,7 @@ export function normalizeApparelForFeed(apparel: string, option: ClothingCategor
   return apparel;
 }
 
-function normalizedCategorySpecificFields(input: {
+export function normalizedCategorySpecificFields(input: {
   configured: Array<{ tag: string; value: string }>;
   option: ClothingCategoryOption;
   category: string;
@@ -394,10 +394,14 @@ function normalizedCategorySpecificFields(input: {
   }
 
   for (const field of input.configured) {
+    const normalizedField =
+      isOuterwearOption(input.option) && field.tag === "ApparelType"
+        ? { tag: field.tag, value: input.option.label }
+        : field;
     const allowedByTemplate = templateFields.size === 0 || templateFields.has(field.tag);
-    const broadValue = invalidValues.has(field.value);
+    const broadValue = invalidValues.has(normalizedField.value);
     if (allowedByTemplate && !broadValue) {
-      result.set(field.tag, field);
+      result.set(normalizedField.tag, normalizedField);
     }
   }
 
