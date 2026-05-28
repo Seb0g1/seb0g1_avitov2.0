@@ -360,7 +360,10 @@ function normalizeGoodsTypeForFeed(goodsType: string, option: ClothingCategoryOp
   return goodsType;
 }
 
-function normalizeApparelForFeed(apparel: string, option: ClothingCategoryOption) {
+export function normalizeApparelForFeed(apparel: string, option: ClothingCategoryOption) {
+  if (isOuterwearOption(option)) {
+    return "Верхняя одежда";
+  }
   if (!apparel || apparel === "Одежда, обувь, аксессуары" || apparel === option.goodsType) {
     return option.apparel;
   }

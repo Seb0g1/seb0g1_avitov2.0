@@ -4,11 +4,13 @@ import {
   getFeedValidationReasons,
   isActionableFeedStatus,
   normalizeContactPhone,
+  normalizeApparelForFeed,
   normalizeFeedBrand,
   normalizeFeedColor,
   normalizeFeedSize,
   normalizeFeedSizeForCategory
 } from "./feedRows";
+import { clothingCategoryOptions } from "@/lib/avitoOptions";
 
 describe("feed row validation", () => {
   it("normalizes Avito clothing sizes", () => {
@@ -60,6 +62,13 @@ describe("feed row validation", () => {
     expect(normalizeFeedBrand("Mastermind Japan", "Зип-Худи Mastermind Japan black")).toBe("MASTERMIND JAPAN");
     expect(normalizeFeedBrand("ERD", "Футболка ERD black")).toBe("Enfants Riches Deprimes");
     expect(normalizeFeedBrand("поло", "Футболка поло Not From Paris Madame")).toBe("Без бренда");
+  });
+
+  it("uses the Avito parent apparel value for outerwear rows", () => {
+    const outerwear = clothingCategoryOptions.find((option) => option.key === "women-light-jackets");
+
+    expect(outerwear).toBeDefined();
+    expect(normalizeApparelForFeed("Лёгкие куртки и ветровки", outerwear!)).toBe("Верхняя одежда");
   });
 
   it("skips rows without photos", () => {
