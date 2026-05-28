@@ -27,6 +27,38 @@ export const clothingSizeOptions = [
 
 export const clothingSizeValues = clothingSizeOptions.map((size) => size.value);
 
+export const footwearSizeOptions = [
+  { value: "36", label: "36", code: "36" },
+  { value: "36,5", label: "36,5", code: "36_5" },
+  { value: "37", label: "37", code: "37" },
+  { value: "37,5", label: "37,5", code: "37_5" },
+  { value: "38", label: "38", code: "38" },
+  { value: "38,5", label: "38,5", code: "38_5" },
+  { value: "39", label: "39", code: "39" },
+  { value: "39,5", label: "39,5", code: "39_5" },
+  { value: "40", label: "40", code: "40" },
+  { value: "40,5", label: "40,5", code: "40_5" },
+  { value: "41", label: "41", code: "41" },
+  { value: "41,5", label: "41,5", code: "41_5" },
+  { value: "42", label: "42", code: "42" },
+  { value: "42,5", label: "42,5", code: "42_5" },
+  { value: "43", label: "43", code: "43" },
+  { value: "43,5", label: "43,5", code: "43_5" },
+  { value: "44", label: "44", code: "44" },
+  { value: "44,5", label: "44,5", code: "44_5" },
+  { value: "45", label: "45", code: "45" },
+  { value: "45,5", label: "45,5", code: "45_5" },
+  { value: "46", label: "46", code: "46" },
+  { value: "46,5", label: "46,5", code: "46_5" },
+  { value: "47", label: "47", code: "47" },
+  { value: "47,5", label: "47,5", code: "47_5" },
+  { value: "48+", label: "48+", code: "48PLUS" }
+] as const;
+
+export const footwearSizeValues = footwearSizeOptions.map((size) => size.value);
+export const avitoSizeOptions = [...clothingSizeOptions, ...footwearSizeOptions] as const;
+export const avitoSizeValues = avitoSizeOptions.map((size) => size.value);
+
 export const clothingMaterialOptions = [
   "Хлопок",
   "Полиэстер",
@@ -136,6 +168,19 @@ export type ClothingCategoryOption = {
   categorySpecificFields?: readonly AvitoCategoryField[];
   templateFields?: readonly string[];
 };
+
+export function isFootwearCategory(option: Pick<ClothingCategoryOption, "goodsType">) {
+  return /обув/i.test(option.goodsType);
+}
+
+export function sizeOptionsForCategory(option: Pick<ClothingCategoryOption, "goodsType">) {
+  return isFootwearCategory(option) ? footwearSizeOptions : clothingSizeOptions;
+}
+
+export function defaultSizeForCategory(option: Pick<ClothingCategoryOption, "goodsType">): string {
+  const sizes = sizeOptionsForCategory(option);
+  return sizes[0]?.value ?? "48 (M)";
+}
 
 export const clothingCategoryOptions: readonly ClothingCategoryOption[] = [
   {

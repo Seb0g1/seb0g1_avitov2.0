@@ -1,23 +1,37 @@
 import {
+  avitoSizeOptions,
+  avitoSizeValues,
   clothingMaterialOptions,
   clothingSizeOptions,
   clothingSizeValues,
   defaultAdType,
   defaultClothingCondition,
   defaultClothingItem,
+  defaultSizeForCategory,
+  footwearSizeOptions,
+  footwearSizeValues,
   formatClothingMaterials,
-  normalizeClothingMaterials
+  isFootwearCategory,
+  normalizeClothingMaterials,
+  sizeOptionsForCategory
 } from "@/lib/avitoOptions";
 
 export {
+  avitoSizeOptions,
+  avitoSizeValues,
   clothingMaterialOptions,
   clothingSizeOptions,
   clothingSizeValues,
   defaultAdType,
   defaultClothingCondition,
   defaultClothingItem,
+  defaultSizeForCategory,
+  footwearSizeOptions,
+  footwearSizeValues,
   formatClothingMaterials,
-  normalizeClothingMaterials
+  isFootwearCategory,
+  normalizeClothingMaterials,
+  sizeOptionsForCategory
 };
 
 const colorTranslit: Record<string, string> = {
@@ -86,7 +100,7 @@ export function compactCode(value: string) {
 }
 
 export function sizeCode(size: string) {
-  const known = clothingSizeOptions.find((option) => option.value === size);
+  const known = avitoSizeOptions.find((option) => option.value === size);
   if (known) {
     return known.code;
   }

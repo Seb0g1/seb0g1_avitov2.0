@@ -1,6 +1,6 @@
 import { VariantStatus } from "@prisma/client";
 import { z } from "zod";
-import { clothingMaterialOptions, clothingSizeValues, maxClothingMaterials } from "@/lib/avitoOptions";
+import { avitoSizeValues, clothingMaterialOptions, maxClothingMaterials } from "@/lib/avitoOptions";
 
 const decimalInput = z.union([z.string(), z.number()]).transform((value) => String(value));
 const clothingMaterialValues = [...clothingMaterialOptions] as [string, ...string[]];
@@ -43,7 +43,7 @@ export const createVariantSchema = z.object({
 const colorGroupSchema = z.object({
   color: z.string().min(1),
   manufacturerColor: z.string().optional().nullable(),
-  sizes: z.array(z.enum(clothingSizeValues as [string, ...string[]])).min(1)
+  sizes: z.array(z.enum(avitoSizeValues as [string, ...string[]])).min(1)
 });
 
 export const createProductWithVariantsSchema = createProductSchema
@@ -97,5 +97,5 @@ export const bulkStatusSchema = z.object({
 });
 
 export const expandVariantSizesSchema = z.object({
-  sizes: z.array(z.enum(clothingSizeValues as [string, ...string[]])).min(1)
+  sizes: z.array(z.enum(avitoSizeValues as [string, ...string[]])).min(1)
 });

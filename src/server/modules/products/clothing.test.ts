@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildVariantArticle,
   buildVariantDescription,
-  clothingSizeOptions
+  clothingSizeOptions,
+  footwearSizeOptions,
+  sizeCode
 } from "./clothing";
 
 describe("clothing helpers", () => {
@@ -33,6 +35,38 @@ describe("clothing helpers", () => {
       "One size",
       "Без размера"
     ]);
+  });
+
+  it("keeps the fixed Avito footwear size grid", () => {
+    expect(footwearSizeOptions.map((size) => size.value)).toEqual([
+      "36",
+      "36,5",
+      "37",
+      "37,5",
+      "38",
+      "38,5",
+      "39",
+      "39,5",
+      "40",
+      "40,5",
+      "41",
+      "41,5",
+      "42",
+      "42,5",
+      "43",
+      "43,5",
+      "44",
+      "44,5",
+      "45",
+      "45,5",
+      "46",
+      "46,5",
+      "47",
+      "47,5",
+      "48+"
+    ]);
+    expect(sizeCode("36,5")).toBe("36_5");
+    expect(sizeCode("48+")).toBe("48PLUS");
   });
 
   it("builds stable variant articles", () => {

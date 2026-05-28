@@ -7,7 +7,8 @@ import {
   defaultClothingItem,
   getClothingCategoryOption,
   normalizeAvitoColor,
-  normalizeClothingMaterials
+  normalizeClothingMaterials,
+  sizeOptionsForCategory
 } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
@@ -17,7 +18,6 @@ import {
   buildMultiItemGroup,
   buildVariantArticle,
   buildVariantDescription,
-  clothingSizeValues,
   uniqueValues
 } from "./clothing";
 import {
@@ -131,7 +131,7 @@ function productAttributes(input: {
     clothingItem: productSubtype || String(existing.clothingItem ?? defaultClothingItem),
     multiItemName: input.multiItemName?.trim() || String(existing.multiItemName ?? input.title),
     manufacturerColors,
-    sizeGrid: clothingSizeValues,
+    sizeGrid: sizeOptionsForCategory(categoryOption).map((size) => size.value),
     multiItemGroup: String(existing.multiItemGroup ?? buildMultiItemGroup(input.title, seed))
   };
 }

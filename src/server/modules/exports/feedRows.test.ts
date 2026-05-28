@@ -4,7 +4,8 @@ import {
   getFeedValidationReasons,
   isActionableFeedStatus,
   normalizeContactPhone,
-  normalizeFeedSize
+  normalizeFeedSize,
+  normalizeFeedSizeForCategory
 } from "./feedRows";
 
 describe("feed row validation", () => {
@@ -23,6 +24,18 @@ describe("feed row validation", () => {
 
   it("rejects unsupported or empty sizes", () => {
     expect(normalizeFeedSize("Не указан")).toBeNull();
+  });
+
+  it("normalizes official Avito footwear sizes", () => {
+    const input = {
+      goodsType: "Мужская обувь",
+      sizeRequired: true
+    };
+
+    expect(normalizeFeedSizeForCategory({ ...input, size: "36,5" })).toBe("36,5");
+    expect(normalizeFeedSizeForCategory({ ...input, size: "36.5" })).toBe("36,5");
+    expect(normalizeFeedSizeForCategory({ ...input, size: "48+" })).toBe("48+");
+    expect(normalizeFeedSizeForCategory({ ...input, size: "49" })).toBeNull();
   });
 
   it("normalizes Russian contact phones with a plus prefix", () => {

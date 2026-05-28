@@ -20,7 +20,7 @@ import {
   clothingCategoryOptions,
   clothingColorOptions,
   avitoColorSwatch,
-  clothingSizeOptions,
+  defaultSizeForCategory,
   defaultAdType,
   defaultClothingCategory,
   defaultClothingCondition,
@@ -28,6 +28,7 @@ import {
   defaultClothingMaterials,
   formatClothingMaterials,
   maxClothingMaterials,
+  sizeOptionsForCategory,
   type ClothingCategoryOption
 } from "@/lib/avitoOptions";
 import type { ProductDto } from "@/types/catalog";
@@ -56,12 +57,12 @@ const defaultColors = ["Белый", "Чёрный", "Серый", "Бежевы
 const conditionOptions = ["Новое с биркой", "Отличное", "Хорошее", "Удовлетворительное"];
 const adTypeOptions = ["Товар приобретен на продажу", "Товар от производителя"];
 
-function emptyColorGroup(color = ""): ColorGroupDraft {
+function emptyColorGroup(color = "", sizes = ["48 (M)"]): ColorGroupDraft {
   return {
     id: crypto.randomUUID(),
     color,
     manufacturerColor: color,
-    sizes: ["48 (M)"],
+    sizes,
     photos: []
   };
 }
@@ -200,6 +201,7 @@ export function ProductCreationWizard({
     clothingCategories.find((option) => option.key === clothingCategory) ??
     clothingCategories[0] ??
     clothingCategoryOptions[0];
+  const selectedSizeOptions = sizeOptionsForCategory(selectedClothingCategory);
   const categoryOptions = clothingCategories.map((option) => ({
     value: option.key,
     label: `${option.goodsType} / ${option.label}`,
@@ -236,7 +238,7 @@ export function ProductCreationWizard({
 
   function addColorGroup(color = "") {
     const nextColor = color || defaultColors.find((value) => !allColors.includes(value)) || "";
-    const next = emptyColorGroup(nextColor);
+    const next = emptyColorGroup(nextColor, [defaultSizeForCategory(selectedClothingCategory)]);
     setColorGroups((current) => [...current, next]);
     setActiveGroupId(next.id);
   }
@@ -482,6 +484,16 @@ export function ProductCreationWizard({
                       clothingCategoryOptions[0];
                     setClothingCategory(next.key);
                     setClothingItem(next.productSubtype);
+                    const nextSizes = new Set<string>(
+                      sizeOptionsForCategory(next).map((size) => size.value)
+                    );
+                    const fallbackSize = defaultSizeForCategory(next);
+                    setColorGroups((current) =>
+                      current.map((group) => {
+                        const sizes = group.sizes.filter((size) => nextSizes.has(size));
+                        return { ...group, sizes: sizes.length > 0 ? sizes : [fallbackSize] };
+                      })
+                    );
                   }}
                   required
                 />
@@ -628,7 +640,7 @@ export function ProductCreationWizard({
                   <div>
                     <div className="field-caption">Размеры в наличии</div>
                     <div className="size-picker" aria-label={`Размеры для ${group.color || "цвета"}`}>
-                      {clothingSizeOptions.map((size) => (
+                      {selectedSizeOptions.map((size) => (
                         <label className="size-chip" key={size.value}>
                           <input
                             type="checkbox"
@@ -851,7 +863,7 @@ export function ProductCreationWizard({
               <div className="avito-option-block">
                 <strong>Размер</strong>
                 <div className="size-preview-row">
-                  {clothingSizeOptions.map((size) => {
+                  {selectedSizeOptions.map((size) => {
                     const available = activeGroup?.sizes.includes(size.value);
                     return (
                       <span className={`size-preview ${available ? "available" : "disabled"}`} key={size.value}>

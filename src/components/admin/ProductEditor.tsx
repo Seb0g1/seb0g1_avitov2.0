@@ -8,8 +8,8 @@ import {
   clothingMaterialOptions,
   clothingCategoryOptions,
   clothingColorOptions,
-  clothingSizeOptions,
   avitoColorSwatch,
+  defaultSizeForCategory,
   defaultAdType,
   defaultClothingCategory,
   defaultClothingCondition,
@@ -17,6 +17,7 @@ import {
   formatClothingMaterials,
   maxClothingMaterials,
   normalizeClothingMaterials,
+  sizeOptionsForCategory,
   type ClothingCategoryOption
 } from "@/lib/avitoOptions";
 import type { ProductDto, VariantDto } from "@/types/catalog";
@@ -77,7 +78,6 @@ export function ProductEditor({
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [newVariantColor, setNewVariantColor] = useState("Чёрный");
-  const [newVariantSize, setNewVariantSize] = useState("48 (M)");
   const attributes = product.avitoAttributes ?? {};
   const [selectedMaterials, setSelectedMaterials] = useState(() =>
     normalizeClothingMaterials(attributes.materials, attributes.material)
@@ -89,6 +89,9 @@ export function ProductEditor({
     clothingCategories.find((option) => option.key === clothingCategory) ??
     clothingCategories[0] ??
     clothingCategoryOptions[0];
+  const [newVariantSize, setNewVariantSize] = useState(() =>
+    defaultSizeForCategory(selectedClothingCategory)
+  );
   const clothingItem = String(
     attributes.productSubtype ?? attributes.clothingItem ?? selectedClothingCategory.productSubtype ?? defaultClothingItem
   );
@@ -113,7 +116,8 @@ export function ProductEditor({
     label: color,
     swatch: avitoColorSwatch(color)
   }));
-  const sizeOptions = clothingSizeOptions.map((size) => ({
+  const categorySizeOptions = sizeOptionsForCategory(editingCategoryOption);
+  const sizeOptions = categorySizeOptions.map((size) => ({
     value: size.value,
     label: size.value,
     description: size.label === size.value ? undefined : size.label
@@ -192,7 +196,7 @@ export function ProductEditor({
       await jsonRequest(`/api/products/${product.id}/variants`, "POST", variantBody(formData));
       form.reset();
       setNewVariantColor("Чёрный");
-      setNewVariantSize("48 (M)");
+      setNewVariantSize(defaultSizeForCategory(editingCategoryOption));
       setMessage("Вариант добавлен.");
       router.refresh();
     } catch (error) {
@@ -338,6 +342,7 @@ export function ProductEditor({
                   clothingCategoryOptions[0];
                 setEditingClothingCategory(next.key);
                 setEditingClothingItem(next.productSubtype);
+                setNewVariantSize(defaultSizeForCategory(next));
               }}
               required
             />

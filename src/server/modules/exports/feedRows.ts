@@ -1,11 +1,12 @@
 import { VariantStatus } from "@prisma/client";
-import { getClothingCategoryOption, normalizeAvitoColor } from "@/lib/avitoOptions";
+import { getClothingCategoryOption, isFootwearCategory, normalizeAvitoColor } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
 import {
   buildVariantArticle,
   buildVariantDescription,
   clothingSizeOptions,
+  footwearSizeOptions,
   formatClothingMaterials,
   normalizeClothingMaterials,
   uniqueValues
@@ -151,18 +152,14 @@ export function normalizeFeedSize(size: string): string | null {
   return byCode?.value ?? null;
 }
 
+const footwearSizeValueSet = new Set<string>(footwearSizeOptions.map((option) => option.value));
+
 function normalizeFootwearSize(size: string) {
-  const text = size.trim().replace(",", ".");
-  if (/^\d{2}(?:\.\d)?$/.test(text)) {
-    const value = Number(text);
-    if (value >= 16 && value <= 50) {
-      return text;
-    }
-  }
-  return null;
+  const text = size.trim().replace(".", ",");
+  return footwearSizeValueSet.has(text) ? text : null;
 }
 
-function normalizeFeedSizeForCategory(input: {
+export function normalizeFeedSizeForCategory(input: {
   size: string;
   goodsType: string;
   sizeRequired: boolean;
@@ -171,7 +168,7 @@ function normalizeFeedSizeForCategory(input: {
     return input.size.trim() || "Без размера";
   }
 
-  if (/обув/i.test(input.goodsType)) {
+  if (isFootwearCategory({ goodsType: input.goodsType })) {
     return normalizeFootwearSize(input.size) ?? normalizeFeedSize(input.size);
   }
 
@@ -322,6 +319,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const templateFields = stringArray(attributes.categoryTemplateFields);
     const sizeRequired = templateFields.length === 0 || templateFields.includes("Size");
     const category = safeText(variant.product.baseCategory, clothingFeedFieldMap.category);
+    const brand = hasDamagedText(variant.product.brand) ? null : variant.product.brand;
     const goodsType = safeText(attributes.goodsType, categoryOption.goodsType, ["GoodsType"]);
     const size = normalizeFeedSizeForCategory({
       size: variant.size,
@@ -353,8 +351,8 @@ export async function getFeedRowsWithDiagnostics(options?: {
         variant.title,
         color,
         variant.product.title,
-        variant.product.baseCategory,
-        variant.product.brand,
+        category,
+        brand,
         geo.region,
         geo.city,
         geo.address
@@ -437,7 +435,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
           colors,
           sizes
         }),
-      brand: variant.product.brand,
+      brand,
       category,
       goodsType,
       condition,
