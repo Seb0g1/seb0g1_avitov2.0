@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import type { VariantStatus } from "@prisma/client";
 import { CheckSquare, Copy, ExternalLink, Film, Save, Sparkles, Trash2, Upload } from "lucide-react";
 import {
-  clothingMaterialOptions,
   clothingCategoryOptions,
   clothingColorOptions,
   avitoColorSwatch,
@@ -14,9 +13,10 @@ import {
   defaultClothingCategory,
   defaultClothingCondition,
   defaultClothingItem,
-  formatClothingMaterials,
+  formatMaterialsForCategory,
+  materialOptionsForCategory,
   maxClothingMaterials,
-  normalizeClothingMaterials,
+  normalizeMaterialsForCategory,
   sizeOptionsForCategory,
   type ClothingCategoryOption
 } from "@/lib/avitoOptions";
@@ -79,9 +79,6 @@ export function ProductEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [newVariantColor, setNewVariantColor] = useState("Чёрный");
   const attributes = product.avitoAttributes ?? {};
-  const [selectedMaterials, setSelectedMaterials] = useState(() =>
-    normalizeClothingMaterials(attributes.materials, attributes.material)
-  );
   const adType = String(attributes.adType ?? defaultAdType);
   const condition = String(attributes.condition ?? defaultClothingCondition);
   const clothingCategory = String(attributes.clothingCategory ?? defaultClothingCategory);
@@ -89,6 +86,9 @@ export function ProductEditor({
     clothingCategories.find((option) => option.key === clothingCategory) ??
     clothingCategories[0] ??
     clothingCategoryOptions[0];
+  const [selectedMaterials, setSelectedMaterials] = useState(() =>
+    normalizeMaterialsForCategory(attributes.materials, attributes.material, selectedClothingCategory)
+  );
   const [newVariantSize, setNewVariantSize] = useState(() =>
     defaultSizeForCategory(selectedClothingCategory)
   );
@@ -117,6 +117,7 @@ export function ProductEditor({
     swatch: avitoColorSwatch(color)
   }));
   const categorySizeOptions = sizeOptionsForCategory(editingCategoryOption);
+  const categoryMaterialOptions = materialOptionsForCategory(editingCategoryOption);
   const sizeOptions = categorySizeOptions.map((size) => ({
     value: size.value,
     label: size.value,
@@ -156,6 +157,11 @@ export function ProductEditor({
         : undefined
     );
     const categorySpecificFields = categoryFieldsFromForm(formData, nextCategoryFields);
+    const normalizedMaterials = normalizeMaterialsForCategory(
+      selectedMaterials,
+      null,
+      nextClothingCategory
+    );
     try {
       await jsonRequest(`/api/products/${product.id}`, "PATCH", {
         title: formData.get("title"),
@@ -165,8 +171,8 @@ export function ProductEditor({
         supplierUrl: formData.get("supplierUrl"),
         supplierName: formData.get("supplierName"),
         avitoAttributes: {
-          material: formatClothingMaterials(selectedMaterials),
-          materials: selectedMaterials,
+          material: formatMaterialsForCategory(selectedMaterials, null, nextClothingCategory),
+          materials: normalizedMaterials,
           adType: formData.get("adType"),
           condition: formData.get("condition"),
           clothingCategory: formData.get("clothingCategory"),
@@ -343,6 +349,7 @@ export function ProductEditor({
                 setEditingClothingCategory(next.key);
                 setEditingClothingItem(next.productSubtype);
                 setNewVariantSize(defaultSizeForCategory(next));
+                setSelectedMaterials((current) => normalizeMaterialsForCategory(current, null, next));
               }}
               required
             />
@@ -383,7 +390,7 @@ export function ProductEditor({
           <div className="span-full">
             <div className="field-caption">Материал основной части</div>
             <div className="material-picker">
-              {clothingMaterialOptions.map((material) => (
+              {categoryMaterialOptions.map((material) => (
                 <label className="material-check" key={material}>
                   <input
                     type="checkbox"

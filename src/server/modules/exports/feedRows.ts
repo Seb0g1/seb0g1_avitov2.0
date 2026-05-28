@@ -7,8 +7,8 @@ import {
   buildVariantDescription,
   clothingSizeOptions,
   footwearSizeOptions,
-  formatClothingMaterials,
-  normalizeClothingMaterials,
+  formatMaterialsForCategory,
+  normalizeMaterialsForCategory,
   uniqueValues
 } from "@/server/modules/products/clothing";
 import { resolveEffectiveSupplier } from "@/server/modules/suppliers/moysklad";
@@ -101,9 +101,22 @@ function hasDamagedText(value: unknown) {
   return text.includes(damagedTextMarker);
 }
 
+function repairText(value: unknown) {
+  return String(value ?? "")
+    .replaceAll(damagedTextMarker, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function repairLongText(value: unknown) {
+  return String(value ?? "")
+    .replaceAll(damagedTextMarker, "")
+    .trim();
+}
+
 function safeText(value: unknown, fallback: string, placeholders: string[] = []) {
-  const text = String(value ?? "").trim();
-  if (!text || hasDamagedText(text) || placeholders.includes(text)) {
+  const text = repairText(value);
+  if (!text || placeholders.includes(text)) {
     return fallback;
   }
 
@@ -313,20 +326,23 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const attributes = asRecord(variant.product.avitoAttributes);
     const geo = getFeedGeo(attributes);
     const categoryOption = getClothingCategoryOption(attributes.clothingCategory);
-    const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
-    const material = formatClothingMaterials(materials);
+    const materials = normalizeMaterialsForCategory(attributes.materials, attributes.material, categoryOption);
+    const material = formatMaterialsForCategory(attributes.materials, attributes.material, categoryOption);
     const manufacturerColors = asRecord(attributes.manufacturerColors);
     const templateFields = stringArray(attributes.categoryTemplateFields);
     const sizeRequired = templateFields.length === 0 || templateFields.includes("Size");
     const category = safeText(variant.product.baseCategory, clothingFeedFieldMap.category);
-    const brand = hasDamagedText(variant.product.brand) ? null : variant.product.brand;
+    const brand = repairText(variant.product.brand) || null;
     const goodsType = safeText(attributes.goodsType, categoryOption.goodsType, ["GoodsType"]);
+    const rawSize = repairText(variant.size);
     const size = normalizeFeedSizeForCategory({
-      size: variant.size,
+      size: rawSize,
       goodsType,
       sizeRequired
     });
-    const color = normalizeAvitoColor(variant.color);
+    const productTitle = repairText(variant.product.title) || "Товар";
+    const variantTitle = repairText(variant.title) || productTitle;
+    const color = normalizeAvitoColor(repairText(variant.color) || "Не указан");
     const multiItemGroup = String(attributes.multiItemGroup ?? variant.productId);
     const variantKey = sizeRequired
       ? size
@@ -339,7 +355,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const videoUrl = variant.videos.find((video) => video.publicUrl && !hasDamagedText(video.publicUrl))?.publicUrl ?? null;
     const price = Number(variant.price);
     const reasons = getFeedValidationReasons({
-      size: variant.size,
+      size: rawSize,
       normalizedSize: size,
       sizeRequired,
       photos,
@@ -348,9 +364,9 @@ export async function getFeedRowsWithDiagnostics(options?: {
       geoReady: geo.ok,
       duplicate: Boolean(variantKey && seenVariantKeys.has(variantKey)),
       damagedValues: [
-        variant.title,
+        variantTitle,
         color,
-        variant.product.title,
+        productTitle,
         category,
         brand,
         geo.region,
@@ -363,9 +379,9 @@ export async function getFeedRowsWithDiagnostics(options?: {
       skipped.push({
         productId: variant.productId,
         variantId: variant.id,
-        title: variant.title,
-        color: variant.color,
-        size: variant.size,
+        title: variantTitle,
+        color,
+        size: rawSize,
         status: variant.status,
         reasons
       });
@@ -373,14 +389,14 @@ export async function getFeedRowsWithDiagnostics(options?: {
     }
     seenVariantKeys.add(variantKey);
 
-    const safeSize = size ?? variant.size;
-    const article = buildVariantArticle(variant.product.title, color, safeSize);
+    const safeSize = size ?? rawSize;
+    const article = buildVariantArticle(productTitle, color, safeSize);
     const availableVariants = variant.product.variants
       .filter((productVariant) => productVariant.quantity > 0)
       .map((productVariant) => ({
-        color: normalizeAvitoColor(productVariant.color),
+        color: normalizeAvitoColor(repairText(productVariant.color) || "Не указан"),
         size: normalizeFeedSizeForCategory({
-          size: productVariant.size,
+          size: repairText(productVariant.size),
           goodsType,
           sizeRequired
         })
@@ -422,12 +438,12 @@ export async function getFeedRowsWithDiagnostics(options?: {
       externalId: `${variant.productId}-${variant.id}`,
       productId: variant.productId,
       variantId: variant.id,
-      title: variant.title,
+      title: variantTitle,
       description:
-        variant.description ??
-        variant.product.baseDescription ??
+        repairLongText(variant.description) ||
+        repairLongText(variant.product.baseDescription) ||
         buildVariantDescription({
-          title: variant.product.title,
+          title: productTitle,
           materials,
           color,
           size: safeSize,
@@ -444,9 +460,9 @@ export async function getFeedRowsWithDiagnostics(options?: {
       productSubtype,
       categorySpecificFields,
       templateFields,
-      multiItemName: String(attributes.multiItemName ?? variant.product.title),
+      multiItemName: safeText(attributes.multiItemName, productTitle),
       manufacturerColor: normalizeAvitoColor(
-        manufacturerColors[variant.color] ?? manufacturerColors[color] ?? color
+        repairText(manufacturerColors[variant.color] ?? manufacturerColors[color] ?? color) || color
       ),
       material,
       materials,

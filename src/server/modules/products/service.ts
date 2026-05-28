@@ -7,7 +7,7 @@ import {
   defaultClothingItem,
   getClothingCategoryOption,
   normalizeAvitoColor,
-  normalizeClothingMaterials,
+  normalizeMaterialsForCategory,
   sizeOptionsForCategory
 } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
@@ -89,7 +89,11 @@ function productAttributes(input: {
 }) {
   const existing = asRecord(input.avitoAttributes);
   const categoryOption = getClothingCategoryOption(existing.clothingCategory ?? defaultClothingCategory);
-  const materials = normalizeClothingMaterials(input.materials ?? existing.materials, input.material ?? existing.material);
+  const materials = normalizeMaterialsForCategory(
+    input.materials ?? existing.materials,
+    input.material ?? existing.material,
+    categoryOption
+  );
   const seed = crypto.randomUUID();
   const manufacturerColors = {
     ...(asRecord(existing.manufacturerColors) as Record<string, string>),
@@ -231,7 +235,11 @@ export async function createProductWithVariants(input: unknown) {
     ),
     avitoAttributes: data.avitoAttributes
   });
-  const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
+  const materials = normalizeMaterialsForCategory(
+    attributes.materials,
+    attributes.material,
+    getClothingCategoryOption(attributes.clothingCategory)
+  );
   const colors = uniqueValues(colorGroups.map((group) => group.color));
   const sizes = uniqueValues(colorGroups.flatMap((group) => group.sizes));
   const variants =
@@ -358,7 +366,11 @@ export async function regenerateProductDescriptions(id: string) {
     include: { variants: true }
   });
   const attributes = asRecord(product.avitoAttributes);
-  const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
+  const materials = normalizeMaterialsForCategory(
+    attributes.materials,
+    attributes.material,
+    getClothingCategoryOption(attributes.clothingCategory)
+  );
   const colors = uniqueValues(product.variants.map((variant) => variant.color));
   const sizes = uniqueValues(product.variants.map((variant) => variant.size));
 
@@ -547,7 +559,11 @@ export async function expandVariantSizes(id: string, input: unknown) {
   });
 
   const attributes = asRecord(source.product.avitoAttributes);
-  const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
+  const materials = normalizeMaterialsForCategory(
+    attributes.materials,
+    attributes.material,
+    getClothingCategoryOption(attributes.clothingCategory)
+  );
   const currentSizes = source.product.variants
     .filter((variant) => variant.color === source.color && variant.size !== "Не указан")
     .map((variant) => variant.size);

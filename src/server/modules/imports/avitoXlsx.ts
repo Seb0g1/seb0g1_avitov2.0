@@ -7,7 +7,8 @@ import {
   defaultClothingItem,
   getClothingCategoryOption,
   normalizeAvitoColor,
-  normalizeClothingMaterials
+  normalizeMaterialsForCategory,
+  type ClothingCategoryOption
 } from "@/lib/avitoOptions";
 import { env } from "@/server/config/env";
 import { prisma } from "@/server/db";
@@ -158,12 +159,12 @@ function parseNumber(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function parseMaterials(value: string | null | undefined) {
+function parseMaterials(value: string | null | undefined, categoryOption: ClothingCategoryOption) {
   const materials = compactText(value)
     .split(/\s*\|\s*|\s*,\s*/)
     .map(compactText)
     .filter(Boolean);
-  return normalizeClothingMaterials(materials);
+  return normalizeMaterialsForCategory(materials, null, categoryOption);
 }
 
 function parsePhotos(...values: Array<string | null | undefined>) {
@@ -307,7 +308,7 @@ function parseSheet(sheet: ExcelJS.Worksheet): AvitoXlsxParseResult {
       brand: firstText(get("brand")),
       color,
       manufacturerColor,
-      materials: parseMaterials(get("materials")),
+      materials: parseMaterials(get("materials"), categoryOption),
       multiItem: parseBooleanYes(get("multiItem")),
       multiItemName,
       apparel,

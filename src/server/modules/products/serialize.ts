@@ -4,7 +4,7 @@ import {
   resolveEffectiveSupplier,
   type SupplierLink
 } from "@/server/modules/suppliers/moysklad";
-import { normalizeClothingMaterials } from "@/server/modules/products/clothing";
+import { getClothingCategoryOption, normalizeMaterialsForCategory } from "@/lib/avitoOptions";
 import type { ActionLogDto, ErrorLogDto, JobDto, ProductDto, SupplierDto, VariantDto } from "@/types/catalog";
 
 type VariantWithPhotos = Variant & { photos: Photo[]; videos: Video[] };
@@ -65,13 +65,20 @@ export function serializeVariant(variant: VariantWithPhotos, product?: Product):
 export function serializeProduct(product: ProductWithVariants): ProductDto {
   const avitoAttributes =
     product.avitoAttributes && typeof product.avitoAttributes === "object" && !Array.isArray(product.avitoAttributes)
-      ? {
-          ...(product.avitoAttributes as Record<string, unknown>),
-          materials: normalizeClothingMaterials(
-            (product.avitoAttributes as Record<string, unknown>).materials,
-            (product.avitoAttributes as Record<string, unknown>).material
-          )
-        }
+      ? (() => {
+          const attributes = product.avitoAttributes as Record<string, unknown>;
+          const categoryOption = getClothingCategoryOption(attributes.clothingCategory);
+          const materials = normalizeMaterialsForCategory(
+            attributes.materials,
+            attributes.material,
+            categoryOption
+          );
+          return {
+            ...attributes,
+            materials,
+            material: materials.join(", ")
+          };
+        })()
       : null;
 
   const supplier = serializeSupplier(ownerSupplier(product));

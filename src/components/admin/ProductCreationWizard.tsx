@@ -16,7 +16,6 @@ import {
   Upload
 } from "lucide-react";
 import {
-  clothingMaterialOptions,
   clothingCategoryOptions,
   clothingColorOptions,
   avitoColorSwatch,
@@ -26,8 +25,10 @@ import {
   defaultClothingCondition,
   defaultClothingItem,
   defaultClothingMaterials,
-  formatClothingMaterials,
+  formatMaterialsForCategory,
+  materialOptionsForCategory,
   maxClothingMaterials,
+  normalizeMaterialsForCategory,
   sizeOptionsForCategory,
   type ClothingCategoryOption
 } from "@/lib/avitoOptions";
@@ -127,14 +128,14 @@ function colorStyle(color: string) {
 
 function previewDescription(input: {
   title: string;
-  materials: string[];
+  materialText: string;
   colors: string[];
   sizes: string[];
   color: string;
   size: string;
 }) {
   const title = input.title || "Название товара";
-  const material = formatClothingMaterials(input.materials);
+  const material = input.materialText;
   const colors = input.colors.join(", ") || input.color || "Цвет не указан";
   const sizes = input.sizes.join(", ") || input.size || "Размеры не указаны";
 
@@ -202,6 +203,7 @@ export function ProductCreationWizard({
     clothingCategories[0] ??
     clothingCategoryOptions[0];
   const selectedSizeOptions = sizeOptionsForCategory(selectedClothingCategory);
+  const selectedMaterialOptions = materialOptionsForCategory(selectedClothingCategory);
   const categoryOptions = clothingCategories.map((option) => ({
     value: option.key,
     label: `${option.goodsType} / ${option.label}`,
@@ -213,6 +215,12 @@ export function ProductCreationWizard({
     label: color,
     swatch: avitoColorSwatch(color)
   }));
+  const normalizedMaterials = normalizeMaterialsForCategory(
+    materials,
+    null,
+    selectedClothingCategory
+  );
+  const materialText = formatMaterialsForCategory(materials, null, selectedClothingCategory);
 
   const preview = useMemo(
     () => ({
@@ -220,14 +228,14 @@ export function ProductCreationWizard({
       price: formatPrice(price),
       description: previewDescription({
         title: title.trim(),
-        materials,
+        materialText,
         colors: allColors,
         sizes: allSizes,
         color: activeGroup?.color ?? "",
         size: activeGroup?.sizes[0] ?? ""
       })
     }),
-    [activeGroup?.color, activeGroup?.sizes, allColors, allSizes, materials, price, title]
+    [activeGroup?.color, activeGroup?.sizes, allColors, allSizes, materialText, price, title]
   );
 
   function updateColorGroup(id: string, patch: Partial<ColorGroupDraft>) {
@@ -369,8 +377,8 @@ export function ProductCreationWizard({
         title,
         brand,
         baseCategory,
-        material: formatClothingMaterials(materials),
-        materials,
+        material: materialText,
+        materials: normalizedMaterials,
         adType,
         condition,
         clothingItem,
@@ -484,6 +492,7 @@ export function ProductCreationWizard({
                       clothingCategoryOptions[0];
                     setClothingCategory(next.key);
                     setClothingItem(next.productSubtype);
+                    setMaterials((current) => normalizeMaterialsForCategory(current, null, next));
                     const nextSizes = new Set<string>(
                       sizeOptionsForCategory(next).map((size) => size.value)
                     );
@@ -741,7 +750,7 @@ export function ProductCreationWizard({
               <div className="span-full">
                 <div className="field-caption">Материал основной части</div>
                 <div className="material-picker">
-                  {clothingMaterialOptions.map((material) => {
+                  {selectedMaterialOptions.map((material) => {
                     const checked = materials.includes(material);
                     return (
                       <button
@@ -877,7 +886,7 @@ export function ProductCreationWizard({
               <div className="preview-checklist">
                 <div>
                   <Shirt size={14} aria-hidden />
-                  <strong>{formatClothingMaterials(materials)}</strong>
+                  <strong>{materialText}</strong>
                 </div>
                 <div>
                   <ListChecks size={14} aria-hidden />
