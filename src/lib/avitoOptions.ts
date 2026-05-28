@@ -114,9 +114,71 @@ export const footwearMaterialOptions = [
   "Юфть"
 ] as const;
 
+export const jeansMaterialOptions = [
+  "Акрил",
+  "Ангора",
+  "Атлас",
+  "Ацетат",
+  "Байка",
+  "Бамбук",
+  "Бархат",
+  "Бифлекс",
+  "Болонь",
+  "Вельвет",
+  "Велюр",
+  "Вискоза",
+  "Джинса/деним",
+  "Драп",
+  "Жаккард",
+  "Искусственная замша",
+  "Искусственный мех",
+  "Кашемир",
+  "Креп",
+  "Лайкра",
+  "Лён",
+  "Люрекс",
+  "Микрофибра",
+  "Модал",
+  "Мохер",
+  "Муслин",
+  "Натуральная замша",
+  "Натуральная кожа",
+  "Натуральный",
+  "Натуральный мех",
+  "Нейлон",
+  "Неопрен",
+  "Норка",
+  "Овчина",
+  "Плащевка",
+  "Плюш",
+  "Полиамид",
+  "Полиэстер",
+  "Сатин",
+  "Синтетический",
+  "Спандекс",
+  "Таслан",
+  "Твид",
+  "Тинсулейт",
+  "Флис",
+  "Футер",
+  "Хлопок",
+  "Шёлк",
+  "Шерпа",
+  "Шерсть",
+  "Шифон",
+  "Экокожа",
+  "Экомех",
+  "Эластан"
+] as const;
+
 export const defaultClothingMaterials = ["Хлопок"];
 export const defaultFootwearMaterials = ["Синтетический"];
-export const avitoMaterialOptions = [...clothingMaterialOptions, ...footwearMaterialOptions] as const;
+export const defaultJeansMaterials = ["Джинса/деним"];
+export const avitoMaterialOptions = [
+  ...clothingMaterialOptions,
+  ...footwearMaterialOptions,
+  ...jeansMaterialOptions
+] as const;
 export const avitoMaterialValues = [...new Set(avitoMaterialOptions.map((material) => material))];
 export const maxClothingMaterials = 5;
 export const defaultAdType = "Товар приобретен на продажу";
@@ -211,8 +273,17 @@ export type ClothingCategoryOption = {
   templateFields?: readonly string[];
 };
 
+type CategoryKindInput = Pick<ClothingCategoryOption, "goodsType"> &
+  Partial<Pick<ClothingCategoryOption, "key" | "label" | "apparel" | "productSubtype">>;
+
 export function isFootwearCategory(option: Pick<ClothingCategoryOption, "goodsType">) {
   return /обув/i.test(option.goodsType);
+}
+
+export function isJeansCategory(option: CategoryKindInput) {
+  return [option.key, option.label, option.apparel, option.productSubtype]
+    .map((value) => String(value ?? "").toLowerCase())
+    .some((value) => value.includes("джинс"));
 }
 
 export function sizeOptionsForCategory(option: Pick<ClothingCategoryOption, "goodsType">) {
@@ -224,11 +295,17 @@ export function defaultSizeForCategory(option: Pick<ClothingCategoryOption, "goo
   return sizes[0]?.value ?? "48 (M)";
 }
 
-export function materialOptionsForCategory(option: Pick<ClothingCategoryOption, "goodsType">) {
+export function materialOptionsForCategory(option: CategoryKindInput) {
+  if (isJeansCategory(option)) {
+    return jeansMaterialOptions;
+  }
   return isFootwearCategory(option) ? footwearMaterialOptions : clothingMaterialOptions;
 }
 
-export function defaultMaterialsForCategory(option: Pick<ClothingCategoryOption, "goodsType">) {
+export function defaultMaterialsForCategory(option: CategoryKindInput) {
+  if (isJeansCategory(option)) {
+    return [...defaultJeansMaterials];
+  }
   return isFootwearCategory(option) ? [...defaultFootwearMaterials] : [...defaultClothingMaterials];
 }
 
@@ -463,6 +540,40 @@ const footwearMaterialAliases: Array<[string, string]> = [
   ["лён", "Лён"]
 ];
 
+const jeansMaterialAliases: Array<[string, string]> = [
+  ["джинса", "Джинса/деним"],
+  ["джинс", "Джинса/деним"],
+  ["деним", "Джинса/деним"],
+  ["искусственная замша", "Искусственная замша"],
+  ["искусственный мех", "Искусственный мех"],
+  ["натуральная замша", "Натуральная замша"],
+  ["натуральная кожа", "Натуральная кожа"],
+  ["натуральный мех", "Натуральный мех"],
+  ["искусственная кожа", "Экокожа"],
+  ["экокожа", "Экокожа"],
+  ["экомех", "Экомех"],
+  ["кожа", "Натуральная кожа"],
+  ["замша", "Натуральная замша"],
+  ["полиэстер", "Полиэстер"],
+  ["полиамид", "Полиамид"],
+  ["эластан", "Эластан"],
+  ["спандекс", "Спандекс"],
+  ["лайкра", "Лайкра"],
+  ["вискоз", "Вискоза"],
+  ["акрил", "Акрил"],
+  ["хлоп", "Хлопок"],
+  ["нейлон", "Нейлон"],
+  ["шерст", "Шерсть"],
+  ["шелк", "Шёлк"],
+  ["шёлк", "Шёлк"],
+  ["лен", "Лён"],
+  ["лён", "Лён"],
+  ["вельвет", "Вельвет"],
+  ["синтет", "Синтетический"],
+  ["флис", "Флис"],
+  ["футер", "Футер"]
+];
+
 function uniqueFilled(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
@@ -511,7 +622,7 @@ export function formatClothingMaterials(materials?: unknown, legacyMaterial?: un
 export function normalizeMaterialsForCategory(
   input: unknown,
   legacyMaterial: unknown,
-  option: Pick<ClothingCategoryOption, "goodsType">
+  option: CategoryKindInput
 ) {
   const fromArray = Array.isArray(input)
     ? input.map((value) => String(value))
@@ -520,11 +631,12 @@ export function normalizeMaterialsForCategory(
       : [];
   const fromLegacy = typeof legacyMaterial === "string" ? legacyMaterial.split(",") : [];
   const footwear = isFootwearCategory(option);
+  const jeans = isJeansCategory(option);
   const options = materialOptionsForCategory(option);
-  const aliases = footwear ? footwearMaterialAliases : materialAliases;
+  const aliases = jeans ? jeansMaterialAliases : footwear ? footwearMaterialAliases : materialAliases;
   const normalized = uniqueFilled(
     [...fromArray, ...fromLegacy].map((value) =>
-      normalizeOneMaterial(value, options, aliases, footwear)
+      normalizeOneMaterial(value, options, aliases, footwear || jeans)
     )
   ).slice(0, maxClothingMaterials);
 
@@ -534,7 +646,7 @@ export function normalizeMaterialsForCategory(
 export function formatMaterialsForCategory(
   materials: unknown,
   legacyMaterial: unknown,
-  option: Pick<ClothingCategoryOption, "goodsType">
+  option: CategoryKindInput
 ) {
   return normalizeMaterialsForCategory(materials, legacyMaterial, option).join(", ");
 }

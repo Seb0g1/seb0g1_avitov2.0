@@ -26,4 +26,18 @@ describe("Avito options", () => {
       "Синтетический"
     ]);
   });
+
+  it("uses Avito jeans materials for jeans categories", () => {
+    const jeans = getClothingCategoryOption("women-jeans");
+    expect(materialOptionsForCategory(jeans)).toContain("Джинса/деним");
+    expect(materialOptionsForCategory(jeans)).toContain("Полиэстер");
+    expect(materialOptionsForCategory(jeans)).toContain("Эластан");
+    expect(normalizeMaterialsForCategory(["деним", "спандекс"], null, jeans)).toEqual([
+      "Джинса/деним",
+      "Спандекс"
+    ]);
+    expect(normalizeMaterialsForCategory(["Непонятный материал"], null, jeans)).toEqual([
+      "Джинса/деним"
+    ]);
+  });
 });
