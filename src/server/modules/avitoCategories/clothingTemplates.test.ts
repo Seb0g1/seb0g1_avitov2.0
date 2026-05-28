@@ -43,4 +43,30 @@ describe("Avito clothing XML category templates", () => {
     expect(jeans.apparel).toBe("Джинсы");
     expect(jeans.extraField).toBeUndefined();
   });
+
+  it("imports footwear and bag templates without Apparel or Size", () => {
+    const sneakers = parseAvitoCategoryXmlTemplate(
+      xmlWith(["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "ApparelType", "Size", "TargetAudience"]),
+      "Мужская обувь - Кроссовки - Шаблон 28-05-2026.xml"
+    );
+    const bag = parseAvitoCategoryXmlTemplate(
+      xmlWith(["GoodsType", "Condition", "AdType", "Brand", "Model", "Color", "ColorName", "Apparel", "ApparelType", "Material", "Gender", "TargetAudience"]),
+      "Сумки, рюкзаки и чемоданы - Сумки - Шаблон 28-05-2026.xml"
+    );
+
+    expect(sneakers.goodsType).toBe("Мужская обувь");
+    expect(sneakers.apparel).toBe("Кроссовки");
+    expect(sneakers.categorySpecificFields).toEqual([{ tag: "ApparelType", value: "Кроссовки" }]);
+    expect(sneakers.templateFields).toContain("Size");
+    expect(sneakers.templateFields).not.toContain("Apparel");
+
+    expect(bag.goodsType).toBe("Сумки, рюкзаки и чемоданы");
+    expect(bag.categorySpecificFields).toEqual([
+      { tag: "Model", value: "Сумки" },
+      { tag: "ApparelType", value: "Сумки" },
+      { tag: "Material", value: "Текстиль" },
+      { tag: "Gender", value: "Унисекс" }
+    ]);
+    expect(bag.templateFields).not.toContain("Size");
+  });
 });

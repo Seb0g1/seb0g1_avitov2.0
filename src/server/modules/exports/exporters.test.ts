@@ -24,6 +24,7 @@ const rows: FeedRow[] = [
     clothingItem: "Кофты и футболки",
     productSubtype: "Футболка",
     categorySpecificFields: [{ tag: "GoodsSubType", value: "Футболка" }],
+    templateFields: [],
     multiItemName: "Nike Stussy",
     manufacturerColor: "Black",
     multiItem: true,
@@ -67,6 +68,7 @@ const rows: FeedRow[] = [
     clothingItem: "Кофты и футболки",
     productSubtype: "Футболка",
     categorySpecificFields: [{ tag: "GoodsSubType", value: "Футболка" }],
+    templateFields: [],
     multiItemName: "Nike Stussy",
     manufacturerColor: "Grey",
     multiItem: true,
@@ -146,6 +148,42 @@ describe("Avito exporters", () => {
     expect(xml).toContain("<ShortsStyle>Повседневные</ShortsStyle>");
     expect(xml).toContain("<Apparel>Джинсы</Apparel>");
     expect(xml).not.toContain("<GoodsSubType>Джинсы</GoodsSubType>");
+  });
+
+  it("uses template fields for footwear and bags", () => {
+    const xml = buildAvitoXml([
+      {
+        ...rows[0],
+        externalId: "shoe-row",
+        goodsType: "Мужская обувь",
+        clothingItem: "Кроссовки",
+        productSubtype: "Кроссовки",
+        categorySpecificFields: [{ tag: "ApparelType", value: "Кроссовки" }],
+        templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "VideoFileURL", "MultiItem", "MultiName", "ApparelType", "Size", "TargetAudience"],
+        size: "42"
+      },
+      {
+        ...rows[0],
+        externalId: "bag-row",
+        goodsType: "Сумки, рюкзаки и чемоданы",
+        clothingItem: "Сумки",
+        productSubtype: "Сумки",
+        categorySpecificFields: [
+          { tag: "ApparelType", value: "Сумки" },
+          { tag: "Material", value: "Текстиль" },
+          { tag: "Gender", value: "Унисекс" }
+        ],
+        templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Model", "Color", "ColorName", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "ApparelType", "Material", "Gender", "TargetAudience"],
+        size: "Не указан"
+      }
+    ]);
+
+    expect(xml).toContain("<ApparelType>Кроссовки</ApparelType>");
+    expect(xml).toContain("<Size>42</Size>");
+    expect(xml).not.toContain("<Apparel>Кроссовки</Apparel>");
+    expect(xml).toContain("<Apparel>Сумки</Apparel>");
+    expect(xml).toContain("<Material>Текстиль</Material>");
+    expect(xml).not.toContain("<Size>Не указан</Size>");
   });
 
   it("creates one CSV row per variant plus header", () => {

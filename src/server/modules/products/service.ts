@@ -36,6 +36,25 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function stringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item)).filter(Boolean)
+    : [];
+}
+
+function categoryFields(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    const record = asRecord(item);
+    const tag = String(record.tag ?? "").trim();
+    const fieldValue = String(record.value ?? "").trim();
+    return tag ? [{ tag, value: fieldValue }] : [];
+  });
+}
+
 function productAttributes(input: {
   title: string;
   material?: string | null;
@@ -57,6 +76,23 @@ function productAttributes(input: {
   };
   const clothingCategory = String(existing.clothingCategory ?? categoryOption.key);
   const productSubtype = input.clothingItem?.trim() || String(existing.productSubtype ?? existing.clothingItem ?? categoryOption.productSubtype);
+  const optionCategoryFields =
+    categoryOption.categorySpecificFields ??
+    (categoryOption.extraField
+      ? [{ tag: categoryOption.extraField, value: categoryOption.extraValue ?? productSubtype }]
+      : []);
+  const normalizedCategoryFields = categoryFields(existing.categorySpecificFields);
+  const categorySpecificFields =
+    normalizedCategoryFields.length > 0
+      ? normalizedCategoryFields
+      : optionCategoryFields.map((field) => ({
+          tag: field.tag,
+          value: field.value || productSubtype
+        }));
+  const categoryTemplateFields =
+    stringArray(existing.categoryTemplateFields).length > 0
+      ? stringArray(existing.categoryTemplateFields)
+      : categoryOption.templateFields ?? [];
   return {
     ...existing,
     materials,
@@ -67,8 +103,10 @@ function productAttributes(input: {
     goodsType: String(existing.goodsType ?? categoryOption.goodsType),
     apparel: String(existing.apparel ?? categoryOption.apparel),
     productSubtype,
-    categoryExtraField: String(existing.categoryExtraField ?? categoryOption.extraField ?? ""),
-    categoryExtraValue: String(existing.categoryExtraValue ?? categoryOption.extraValue ?? productSubtype),
+    categorySpecificFields,
+    categoryTemplateFields,
+    categoryExtraField: String(existing.categoryExtraField ?? categorySpecificFields[0]?.tag ?? ""),
+    categoryExtraValue: String(existing.categoryExtraValue ?? categorySpecificFields[0]?.value ?? productSubtype),
     clothingItem: productSubtype || String(existing.clothingItem ?? defaultClothingItem),
     multiItemName: input.multiItemName?.trim() || String(existing.multiItemName ?? input.title),
     manufacturerColors,

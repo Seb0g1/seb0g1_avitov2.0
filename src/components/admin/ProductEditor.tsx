@@ -8,6 +8,7 @@ import {
   clothingMaterialOptions,
   clothingCategoryOptions,
   clothingColorOptions,
+  avitoColorSwatch,
   defaultAdType,
   defaultClothingCategory,
   defaultClothingCondition,
@@ -18,7 +19,13 @@ import {
   type ClothingCategoryOption
 } from "@/lib/avitoOptions";
 import type { ProductDto, VariantDto } from "@/types/catalog";
+import { SearchableSelect } from "./SearchableSelect";
 import { StatusBadge, variantStatusLabels } from "./StatusBadge";
+import {
+  categoryFieldsForOption,
+  categoryFieldsFromForm,
+  categoryOptionDescription
+} from "./avitoCategoryForm";
 
 const statuses: VariantStatus[] = [
   "DRAFT",
@@ -68,6 +75,7 @@ export function ProductEditor({
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
+  const [newVariantColor, setNewVariantColor] = useState("Чёрный");
   const attributes = product.avitoAttributes ?? {};
   const [selectedMaterials, setSelectedMaterials] = useState(() =>
     normalizeClothingMaterials(attributes.materials, attributes.material)
@@ -84,6 +92,25 @@ export function ProductEditor({
   );
   const [editingClothingCategory, setEditingClothingCategory] = useState(selectedClothingCategory.key);
   const [editingClothingItem, setEditingClothingItem] = useState(clothingItem);
+  const editingCategoryOption =
+    clothingCategories.find((option) => option.key === editingClothingCategory) ??
+    clothingCategoryOptions.find((option) => option.key === editingClothingCategory) ??
+    selectedClothingCategory;
+  const editingCategoryFields = categoryFieldsForOption(
+    editingCategoryOption,
+    editingClothingItem,
+    editingClothingCategory === clothingCategory ? attributes.categorySpecificFields : undefined
+  );
+  const categoryOptions = clothingCategories.map((option) => ({
+    value: option.key,
+    label: `${option.goodsType} / ${option.label}`,
+    description: categoryOptionDescription(option)
+  }));
+  const colorOptions = clothingColorOptions.map((color) => ({
+    value: color,
+    label: color,
+    swatch: avitoColorSwatch(color)
+  }));
   const multiItemName = String(attributes.multiItemName ?? product.title);
 
   function toggleProductMaterial(material: string) {
@@ -109,6 +136,15 @@ export function ProductEditor({
     const nextClothingCategory =
       clothingCategories.find((option) => option.key === formData.get("clothingCategory")) ??
       selectedClothingCategory;
+    const nextClothingItem = String(formData.get("clothingItem") ?? "");
+    const nextCategoryFields = categoryFieldsForOption(
+      nextClothingCategory,
+      nextClothingItem,
+      String(formData.get("clothingCategory") ?? "") === clothingCategory
+        ? attributes.categorySpecificFields
+        : undefined
+    );
+    const categorySpecificFields = categoryFieldsFromForm(formData, nextCategoryFields);
     try {
       await jsonRequest(`/api/products/${product.id}`, "PATCH", {
         title: formData.get("title"),
@@ -125,10 +161,12 @@ export function ProductEditor({
           clothingCategory: formData.get("clothingCategory"),
           goodsType: nextClothingCategory.goodsType,
           apparel: nextClothingCategory.apparel,
-          productSubtype: formData.get("clothingItem") || nextClothingCategory.productSubtype,
-          categoryExtraField: nextClothingCategory.extraField,
-          categoryExtraValue: nextClothingCategory.extraValue,
-          clothingItem: formData.get("clothingItem") || nextClothingCategory.productSubtype,
+          productSubtype: nextClothingItem || nextClothingCategory.productSubtype,
+          categorySpecificFields,
+          categoryTemplateFields: nextClothingCategory.templateFields ?? [],
+          categoryExtraField: categorySpecificFields[0]?.tag ?? nextClothingCategory.extraField,
+          categoryExtraValue: categorySpecificFields[0]?.value ?? nextClothingCategory.extraValue,
+          clothingItem: nextClothingItem || nextClothingCategory.productSubtype,
           multiItemName: formData.get("multiItemName")
         }
       });
@@ -146,6 +184,7 @@ export function ProductEditor({
     try {
       await jsonRequest(`/api/products/${product.id}/variants`, "POST", variantBody(formData));
       form.reset();
+      setNewVariantColor("Чёрный");
       setMessage("Вариант добавлен.");
       router.refresh();
     } catch (error) {
@@ -249,27 +288,22 @@ export function ProductEditor({
           </label>
           <label>
             Категория одежды
-            <select
-              className="select"
+            <SearchableSelect
               name="clothingCategory"
               value={editingClothingCategory}
-              onChange={(event) => {
+              options={categoryOptions}
+              placeholder="Поиск категории Avito"
+              onChange={(value) => {
                 const next =
-                  clothingCategories.find((option) => option.key === event.target.value) ??
-                  clothingCategoryOptions.find((option) => option.key === event.target.value) ??
+                  clothingCategories.find((option) => option.key === value) ??
+                  clothingCategoryOptions.find((option) => option.key === value) ??
                   clothingCategories[0] ??
                   clothingCategoryOptions[0];
                 setEditingClothingCategory(next.key);
                 setEditingClothingItem(next.productSubtype);
               }}
               required
-            >
-              {clothingCategories.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.goodsType} / {option.label}
-                </option>
-              ))}
-            </select>
+            />
           </label>
           <label>
             Вид объявления
@@ -289,6 +323,17 @@ export function ProductEditor({
               required
             />
           </label>
+          {editingCategoryFields.map((field) => (
+            <label key={`${editingClothingCategory}:${field.tag}`}>
+              {field.tag}
+              <input
+                className="field"
+                name={`categoryField:${field.tag}`}
+                defaultValue={field.value}
+                required
+              />
+            </label>
+          ))}
           <label>
             Название мультиобъявления
             <input className="field" name="multiItemName" defaultValue={multiItemName} required />
@@ -365,13 +410,14 @@ export function ProductEditor({
           </label>
           <label>
             Цвет
-            <select className="select" name="color" defaultValue="Чёрный" required>
-              {clothingColorOptions.map((color) => (
-                <option key={color} value={color}>
-                  {color}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              name="color"
+              value={newVariantColor}
+              options={colorOptions}
+              placeholder="Поиск цвета"
+              onChange={setNewVariantColor}
+              required
+            />
           </label>
           <label>
             Размер
@@ -421,6 +467,7 @@ export function ProductEditor({
               onUploadVideo={uploadVideos}
               onRemovePhoto={removePhoto}
               onRemoveVideo={removeVideo}
+              colorOptions={colorOptions}
             />
           ))}
         </div>
@@ -437,7 +484,8 @@ function VariantEditor({
   onUpload,
   onUploadVideo,
   onRemovePhoto,
-  onRemoveVideo
+  onRemoveVideo,
+  colorOptions
 }: {
   variant: VariantDto;
   onSubmit: (event: FormEvent<HTMLFormElement>, variantId: string) => void;
@@ -447,7 +495,10 @@ function VariantEditor({
   onUploadVideo: (variantId: string, files: FileList | File[]) => void;
   onRemovePhoto: (photoId: string) => void;
   onRemoveVideo: (videoId: string) => void;
+  colorOptions: Array<{ value: string; label: string; swatch?: string }>;
 }) {
+  const [editingColor, setEditingColor] = useState(variant.color);
+
   function drop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     if (event.dataTransfer.files.length > 0) {
@@ -471,16 +522,18 @@ function VariantEditor({
         </label>
         <label>
           Цвет
-          <select className="select" name="color" defaultValue={variant.color} required>
-            {!clothingColorOptions.includes(variant.color as (typeof clothingColorOptions)[number]) ? (
-              <option value={variant.color}>{variant.color}</option>
-            ) : null}
-            {clothingColorOptions.map((color) => (
-              <option key={color} value={color}>
-                {color}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            name="color"
+            value={editingColor}
+            options={
+              colorOptions.some((option) => option.value === variant.color)
+                ? colorOptions
+                : [{ value: variant.color, label: variant.color }, ...colorOptions]
+            }
+            placeholder="Поиск цвета"
+            onChange={setEditingColor}
+            required
+          />
         </label>
         <label>
           Размер

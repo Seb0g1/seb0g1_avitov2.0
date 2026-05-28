@@ -19,6 +19,7 @@ import {
   clothingMaterialOptions,
   clothingCategoryOptions,
   clothingColorOptions,
+  avitoColorSwatch,
   clothingSizeOptions,
   defaultAdType,
   defaultClothingCategory,
@@ -30,6 +31,12 @@ import {
   type ClothingCategoryOption
 } from "@/lib/avitoOptions";
 import type { ProductDto } from "@/types/catalog";
+import { SearchableSelect } from "./SearchableSelect";
+import {
+  categoryFieldsForOption,
+  categoryFieldsFromForm,
+  categoryOptionDescription
+} from "./avitoCategoryForm";
 
 type LocalPhoto = {
   id: string;
@@ -180,6 +187,17 @@ export function ProductCreationWizard({
     clothingCategories.find((option) => option.key === clothingCategory) ??
     clothingCategories[0] ??
     clothingCategoryOptions[0];
+  const categoryOptions = clothingCategories.map((option) => ({
+    value: option.key,
+    label: `${option.goodsType} / ${option.label}`,
+    description: categoryOptionDescription(option)
+  }));
+  const selectedCategoryFields = categoryFieldsForOption(selectedClothingCategory, clothingItem);
+  const colorOptions = clothingColorOptions.map((color) => ({
+    value: color,
+    label: color,
+    swatch: avitoColorSwatch(color)
+  }));
 
   const preview = useMemo(
     () => ({
@@ -312,6 +330,8 @@ export function ProductCreationWizard({
     event.preventDefault();
     setIsSaving(true);
     setMessage(null);
+    const formData = new FormData(event.currentTarget);
+    const categorySpecificFields = categoryFieldsFromForm(formData, selectedCategoryFields);
 
     const normalizedGroups = colorGroups
       .map((group) => ({
@@ -344,8 +364,10 @@ export function ProductCreationWizard({
           goodsType: selectedClothingCategory.goodsType,
           apparel: selectedClothingCategory.apparel,
           productSubtype: clothingItem,
-          categoryExtraField: selectedClothingCategory.extraField,
-          categoryExtraValue: selectedClothingCategory.extraValue
+          categorySpecificFields,
+          categoryTemplateFields: selectedClothingCategory.templateFields ?? [],
+          categoryExtraField: categorySpecificFields[0]?.tag ?? selectedClothingCategory.extraField,
+          categoryExtraValue: categorySpecificFields[0]?.value ?? selectedClothingCategory.extraValue
         },
         multiItemName: effectiveMultiItemName,
         price,
@@ -449,27 +471,34 @@ export function ProductCreationWizard({
               </label>
               <label className="span-full">
                 Категория одежды
-                <select
-                  className="select"
+                <SearchableSelect
+                  name="clothingCategory"
                   value={clothingCategory}
-                  onChange={(event) => {
+                  options={categoryOptions}
+                  placeholder="Поиск категории Avito"
+                  onChange={(value) => {
                     const next =
-                      clothingCategories.find((option) => option.key === event.target.value) ??
-                      clothingCategoryOptions.find((option) => option.key === event.target.value) ??
+                      clothingCategories.find((option) => option.key === value) ??
+                      clothingCategoryOptions.find((option) => option.key === value) ??
                       clothingCategories[0] ??
                       clothingCategoryOptions[0];
                     setClothingCategory(next.key);
                     setClothingItem(next.productSubtype);
                   }}
                   required
-                >
-                  {clothingCategories.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.goodsType} / {option.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
+              {selectedCategoryFields.map((field) => (
+                <label key={`${clothingCategory}:${field.tag}`}>
+                  {field.tag}
+                  <input
+                    className="field"
+                    name={`categoryField:${field.tag}`}
+                    defaultValue={field.value}
+                    required
+                  />
+                </label>
+              ))}
               <label className="span-full">
                 Ссылка поставщика
                 <div className="field-with-icon">
@@ -549,27 +578,24 @@ export function ProductCreationWizard({
                     <div className="variant-row-index">{index + 1}</div>
                     <label>
                       Цвет
-                      <select
-                        className="select"
+                      <SearchableSelect
+                        name={`color-${group.id}`}
                         value={group.color}
-                        onChange={(event) =>
+                        options={
+                          colorOptions.some((option) => option.value === group.color) || !group.color
+                            ? colorOptions
+                            : [{ value: group.color, label: group.color }, ...colorOptions]
+                        }
+                        placeholder="Поиск цвета"
+                        onChange={(value) =>
                           updateColorGroup(group.id, {
-                            color: event.target.value,
+                            color: value,
                             manufacturerColor:
-                              group.manufacturerColor === group.color ? event.target.value : group.manufacturerColor
+                              group.manufacturerColor === group.color ? value : group.manufacturerColor
                           })
                         }
                         required
-                      >
-                        {!clothingColorOptions.includes(group.color as (typeof clothingColorOptions)[number]) && group.color ? (
-                          <option value={group.color}>{group.color}</option>
-                        ) : null}
-                        {clothingColorOptions.map((color) => (
-                          <option key={color} value={color}>
-                            {color}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </label>
                     <label>
                       Цвет от производителя

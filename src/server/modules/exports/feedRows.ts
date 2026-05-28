@@ -30,6 +30,7 @@ export type FeedRow = {
   clothingItem: string;
   productSubtype: string;
   categorySpecificFields: Array<{ tag: string; value: string }>;
+  templateFields: string[];
   multiItemName: string;
   manufacturerColor: string;
   multiItem: boolean;
@@ -108,6 +109,27 @@ function safeText(value: unknown, fallback: string, placeholders: string[] = [])
   return text;
 }
 
+function stringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+}
+
+function categoryFields(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    const record = asRecord(item);
+    const tag = String(record.tag ?? "").trim();
+    const fieldValue = String(record.value ?? "").trim();
+    return tag && fieldValue && !hasDamagedText(tag) && !hasDamagedText(fieldValue)
+      ? [{ tag, value: fieldValue }]
+      : [];
+  });
+}
+
 export function normalizeFeedSize(size: string): string | null {
   const text = size.trim();
   const exact = clothingSizeOptions.find((option) => option.value === text);
@@ -129,12 +151,35 @@ export function normalizeFeedSize(size: string): string | null {
   return byCode?.value ?? null;
 }
 
-function isString(value: string | null): value is string {
-  return typeof value === "string";
+function normalizeFootwearSize(size: string) {
+  const text = size.trim().replace(",", ".");
+  if (/^\d{2}(?:\.\d)?$/.test(text)) {
+    const value = Number(text);
+    if (value >= 16 && value <= 50) {
+      return text;
+    }
+  }
+  return null;
 }
 
-function uniqueFeedSizes(sizes: string[]) {
-  return uniqueValues(sizes.map(normalizeFeedSize).filter(isString));
+function normalizeFeedSizeForCategory(input: {
+  size: string;
+  goodsType: string;
+  sizeRequired: boolean;
+}) {
+  if (!input.sizeRequired) {
+    return input.size.trim() || "Без размера";
+  }
+
+  if (/обув/i.test(input.goodsType)) {
+    return normalizeFootwearSize(input.size) ?? normalizeFeedSize(input.size);
+  }
+
+  return normalizeFeedSize(input.size);
+}
+
+function isString(value: string | null): value is string {
+  return typeof value === "string";
 }
 
 function validCoordinate(value: string | undefined, min: number, max: number) {
@@ -203,6 +248,8 @@ export function isActionableFeedStatus(status: VariantStatus) {
 
 export function getFeedValidationReasons(input: {
   size: string;
+  normalizedSize?: string | null;
+  sizeRequired?: boolean;
   photos: string[];
   price: number;
   quantity: number;
@@ -211,7 +258,7 @@ export function getFeedValidationReasons(input: {
   duplicate?: boolean;
 }) {
   const reasons: FeedSkipReason[] = [];
-  if (!normalizeFeedSize(input.size)) {
+  if (input.sizeRequired !== false && !input.normalizedSize && !normalizeFeedSize(input.size)) {
     reasons.push("неподдерживаемый размер");
   }
   if (input.photos.length === 0) {
@@ -272,12 +319,22 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const materials = normalizeClothingMaterials(attributes.materials, attributes.material);
     const material = formatClothingMaterials(materials);
     const manufacturerColors = asRecord(attributes.manufacturerColors);
-    const size = normalizeFeedSize(variant.size);
+    const templateFields = stringArray(attributes.categoryTemplateFields);
+    const sizeRequired = templateFields.length === 0 || templateFields.includes("Size");
+    const category = safeText(variant.product.baseCategory, clothingFeedFieldMap.category);
+    const goodsType = safeText(attributes.goodsType, categoryOption.goodsType, ["GoodsType"]);
+    const size = normalizeFeedSizeForCategory({
+      size: variant.size,
+      goodsType,
+      sizeRequired
+    });
     const color = normalizeAvitoColor(variant.color);
     const multiItemGroup = String(attributes.multiItemGroup ?? variant.productId);
-    const variantKey = size
-      ? `${multiItemGroup}:${color.trim().toLowerCase()}:${size}`
-      : "";
+    const variantKey = sizeRequired
+      ? size
+        ? `${multiItemGroup}:${color.trim().toLowerCase()}:${size}`
+        : ""
+      : `${multiItemGroup}:${color.trim().toLowerCase()}:nosize`;
     const photos = variant.photos
       .map((photo) => photo.publicUrl)
       .filter((photo) => photo && !hasDamagedText(photo));
@@ -285,6 +342,8 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const price = Number(variant.price);
     const reasons = getFeedValidationReasons({
       size: variant.size,
+      normalizedSize: size,
+      sizeRequired,
       photos,
       price,
       quantity: variant.quantity,
@@ -302,7 +361,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       ]
     });
 
-    if (reasons.length > 0 || !size) {
+    if (reasons.length > 0 || (sizeRequired && !size)) {
       skipped.push({
         productId: variant.productId,
         variantId: variant.id,
@@ -316,12 +375,17 @@ export async function getFeedRowsWithDiagnostics(options?: {
     }
     seenVariantKeys.add(variantKey);
 
-    const article = buildVariantArticle(variant.product.title, color, size);
+    const safeSize = size ?? variant.size;
+    const article = buildVariantArticle(variant.product.title, color, safeSize);
     const availableVariants = variant.product.variants
       .filter((productVariant) => productVariant.quantity > 0)
       .map((productVariant) => ({
         color: normalizeAvitoColor(productVariant.color),
-        size: normalizeFeedSize(productVariant.size)
+        size: normalizeFeedSizeForCategory({
+          size: productVariant.size,
+          goodsType,
+          sizeRequired
+        })
       }))
       .filter(
         (productVariant): productVariant is { color: string; size: string } =>
@@ -330,10 +394,8 @@ export async function getFeedRowsWithDiagnostics(options?: {
     const colors = uniqueValues(
       availableVariants.map((productVariant) => productVariant.color)
     );
-    const sizes = uniqueFeedSizes(availableVariants.map((productVariant) => productVariant.size));
+    const sizes = uniqueValues(availableVariants.map((productVariant) => productVariant.size));
     const supplier = resolveEffectiveSupplier(variant.product, variant);
-    const category = safeText(variant.product.baseCategory, clothingFeedFieldMap.category);
-    const goodsType = safeText(attributes.goodsType, categoryOption.goodsType, ["GoodsType"]);
     const condition = safeText(
       attributes.condition ?? env.DEFAULT_CONDITION,
       clothingFeedDefaults.condition,
@@ -349,13 +411,12 @@ export async function getFeedRowsWithDiagnostics(options?: {
       categoryOption.productSubtype || clothingFeedDefaults.productSubtype,
       ["Subtype"]
     );
+    const configuredCategoryFields = categoryFields(attributes.categorySpecificFields);
     const categoryExtraField = safeText(attributes.categoryExtraField, categoryOption.extraField ?? "");
-    const categoryExtraValue = safeText(
-      attributes.categoryExtraValue,
-      categoryOption.extraValue ?? productSubtype
-    );
-    const categorySpecificFields =
-      categoryExtraField && categoryExtraValue
+    const categoryExtraValue = safeText(attributes.categoryExtraValue, categoryOption.extraValue ?? productSubtype);
+    const categorySpecificFields = configuredCategoryFields.length > 0
+      ? configuredCategoryFields
+      : categoryExtraField && categoryExtraValue
         ? [{ tag: categoryExtraField, value: categoryExtraValue }]
         : [];
 
@@ -371,7 +432,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
           title: variant.product.title,
           materials,
           color,
-          size,
+          size: safeSize,
           article,
           colors,
           sizes
@@ -384,6 +445,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       clothingItem,
       productSubtype,
       categorySpecificFields,
+      templateFields,
       multiItemName: String(attributes.multiItemName ?? variant.product.title),
       manufacturerColor: normalizeAvitoColor(
         manufacturerColors[variant.color] ?? manufacturerColors[color] ?? color
@@ -394,7 +456,7 @@ export async function getFeedRowsWithDiagnostics(options?: {
       multiItemGroup,
       article,
       color,
-      size,
+      size: safeSize,
       price: Number(variant.price),
       quantity: variant.quantity,
       status: variant.status,

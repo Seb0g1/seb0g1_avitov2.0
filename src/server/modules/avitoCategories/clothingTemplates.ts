@@ -3,6 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { convert } from "xmlbuilder2";
 import {
+  type AvitoCategoryField,
   clothingCategoryOptions,
   clothingSizeValues,
   type ClothingCategoryOption
@@ -49,6 +50,8 @@ const commonAdTags = new Set([
   "ReturnPolicy",
   "TryOn",
   "DeliverySubsidy",
+  "MinPreparationDays",
+  "MaxPreparationDays",
   "Price",
   "GoodsType",
   "Condition",
@@ -71,6 +74,13 @@ const defaultSubtypeByApparel: Record<string, string> = {
   "Бомберы": "Бомбер",
   "Спортивные костюмы": "Спортивный костюм",
   "Джинсы": "Джинсы"
+};
+
+const commonCategoryFieldDefaults: Record<string, string> = {
+  Gender: "Унисекс",
+  Hood: "Нет",
+  Material: "Текстиль",
+  WomenJeansModel: "Прямые"
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -105,20 +115,22 @@ function parseNameParts(fileName?: string | null) {
   const parts = base.split(/\s+-\s+/).map((part) => part.trim()).filter(Boolean);
   return {
     goodsType: parts[0] ?? null,
-    apparel: parts[1] ?? parts[0] ?? null
+    apparel: parts.at(-1) ?? parts[1] ?? parts[0] ?? null
   };
 }
 
 function optionKey(input: {
   goodsType: string;
   apparel: string;
-  extraField?: string;
+  fields?: string[];
 }) {
   const builtIn = clothingCategoryOptions.find(
     (option) =>
       option.goodsType.toLowerCase() === input.goodsType.toLowerCase() &&
       option.apparel.toLowerCase() === input.apparel.toLowerCase() &&
-      String(option.extraField ?? "") === String(input.extraField ?? "")
+      (input.fields?.length
+        ? JSON.stringify(option.templateFields ?? []) === JSON.stringify(input.fields)
+        : true)
   );
   if (builtIn) {
     return builtIn.key;
@@ -126,10 +138,41 @@ function optionKey(input: {
 
   const hash = crypto
     .createHash("sha1")
-    .update(`${input.goodsType}:${input.apparel}:${input.extraField ?? ""}`)
+    .update(`${input.goodsType}:${input.apparel}:${(input.fields ?? []).join(",")}`)
     .digest("hex")
     .slice(0, 10);
   return `imported-${hash}` as ClothingCategoryOption["key"];
+}
+
+function defaultCategoryFieldValue(tag: string, input: {
+  goodsType: string;
+  apparel: string;
+  productSubtype: string;
+}) {
+  if (tag === "GoodsSubType" || tag === "ApparelType" || tag === "TopType" || tag === "Model") {
+    return input.productSubtype;
+  }
+  if (tag === "Gender") {
+    if (/жен/i.test(input.goodsType)) return "Женский";
+    if (/муж/i.test(input.goodsType)) return "Мужской";
+  }
+  return commonCategoryFieldDefaults[tag] ?? input.productSubtype;
+}
+
+function categoryFieldsFromTemplate(fields: string[], input: {
+  ad: Record<string, unknown>;
+  goodsType: string;
+  apparel: string;
+  productSubtype: string;
+}): AvitoCategoryField[] {
+  return fields
+    .filter((field) => !commonAdTags.has(field))
+    .map((tag) => ({
+      tag,
+      value:
+        firstText(nodeText(input.ad[tag]), defaultCategoryFieldValue(tag, input)) ??
+        input.productSubtype
+    }));
 }
 
 function toStoredOption(option: ClothingCategoryOption): StoredClothingCategoryOption {
@@ -170,30 +213,39 @@ export function parseAvitoCategoryXmlTemplate(xml: string, fileName?: string | n
   const object = convert(xml, { format: "object" }) as Record<string, unknown>;
   const ad = asRecord(asRecord(object.Ads).Ad);
   const fields = Object.keys(ad);
-  if (!fields.includes("GoodsType") || !fields.includes("Apparel") || !fields.includes("Size")) {
-    throw new Error("Это не похоже на XML-шаблон одежды Avito: нужны теги GoodsType, Apparel и Size.");
+  if (fields.length === 0 || !fields.includes("GoodsType")) {
+    throw new Error("Это не похоже на XML-шаблон Avito: нужен тег GoodsType внутри Ads/Ad.");
   }
 
   const nameParts = parseNameParts(fileName);
-  const categorySpecificFields = fields.filter((field) => !commonAdTags.has(field));
-  const extraField = categorySpecificFields[0] ?? undefined;
+  const templateCategoryFields = fields.filter((field) => !commonAdTags.has(field));
   const goodsType = firstText(nodeText(ad.GoodsType), nameParts.goodsType, "Мужская одежда") ?? "Мужская одежда";
-  const apparel = firstText(nodeText(ad.Apparel), nameParts.apparel, "Кофты и футболки") ?? "Кофты и футболки";
+  const apparel = firstText(nodeText(ad.Apparel), nameParts.apparel, goodsType) ?? goodsType;
   const productSubtype =
     firstText(
-      extraField ? nodeText(ad[extraField]) : null,
+      templateCategoryFields[0] ? nodeText(ad[templateCategoryFields[0]]) : null,
       defaultSubtypeByApparel[apparel],
       apparel
     ) ?? apparel;
+  const categorySpecificFields = categoryFieldsFromTemplate(fields, {
+    ad,
+    goodsType,
+    apparel,
+    productSubtype
+  });
+  const extraField = categorySpecificFields[0]?.tag;
+  const extraValue = categorySpecificFields[0]?.value;
 
   const option: StoredClothingCategoryOption = {
-    key: optionKey({ goodsType, apparel, extraField }),
+    key: optionKey({ goodsType, apparel, fields: templateCategoryFields }),
     label: apparel,
     goodsType,
     apparel,
     productSubtype,
     extraField,
-    extraValue: extraField ? productSubtype : undefined,
+    extraValue,
+    categorySpecificFields,
+    templateFields: fields,
     sourceFile: fileName ?? undefined,
     sourceFields: fields,
     importedAt: new Date().toISOString()

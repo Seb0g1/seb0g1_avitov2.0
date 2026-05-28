@@ -59,7 +59,7 @@ export function ClothingCategoryTemplateImporter({
     <section className="editor-section">
       <div className="toolbar">
         <FileCode size={18} aria-hidden />
-        <h2>Категории одежды Avito</h2>
+        <h2>Категории Avito: Личные вещи</h2>
       </div>
 
       <div className="toolbar">
@@ -86,7 +86,11 @@ export function ClothingCategoryTemplateImporter({
         {categories.map((category) => (
           <span className="data-chip" key={category.key}>
             {category.goodsType} / {category.label}
-            {category.extraField ? ` / ${category.extraField}` : ""}
+            {category.categorySpecificFields?.length
+              ? ` / ${category.categorySpecificFields.map((field) => field.tag).join(", ")}`
+              : category.extraField
+                ? ` / ${category.extraField}`
+                : ""}
           </span>
         ))}
       </div>

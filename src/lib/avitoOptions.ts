@@ -91,7 +91,39 @@ export function normalizeAvitoColor(input?: unknown) {
   return colorAliases[value.toLowerCase()] ?? value;
 }
 
+export function avitoColorSwatch(color: string) {
+  const lower = color.trim().toLowerCase();
+  const map: Record<string, string> = {
+    белый: "#f8fafc",
+    чёрный: "#111827",
+    черный: "#111827",
+    серый: "#9ca3af",
+    бежевый: "#d6c2a8",
+    красный: "#dc2626",
+    розовый: "#f472b6",
+    бордовый: "#7f1d1d",
+    синий: "#2563eb",
+    жёлтый: "#facc15",
+    желтый: "#facc15",
+    голубой: "#38bdf8",
+    фиолетовый: "#7c3aed",
+    оранжевый: "#f97316",
+    разноцветный: "linear-gradient(135deg, #ef4444, #facc15, #22c55e, #3b82f6)",
+    коричневый: "#92400e",
+    зелёный: "#16a34a",
+    зеленый: "#16a34a",
+    серебряный: "#cbd5e1",
+    золотой: "#f59e0b"
+  };
+  return map[lower] ?? "#e5e7eb";
+}
+
 export type ClothingCategoryKey = "shirts" | "shorts" | "tracksuits" | "jeans" | "bombers";
+
+export type AvitoCategoryField = {
+  tag: string;
+  value: string;
+};
 
 export type ClothingCategoryOption = {
   key: ClothingCategoryKey | (string & {});
@@ -101,6 +133,8 @@ export type ClothingCategoryOption = {
   productSubtype: string;
   extraField?: string;
   extraValue?: string;
+  categorySpecificFields?: readonly AvitoCategoryField[];
+  templateFields?: readonly string[];
 };
 
 export const clothingCategoryOptions: readonly ClothingCategoryOption[] = [
@@ -144,6 +178,132 @@ export const clothingCategoryOptions: readonly ClothingCategoryOption[] = [
     productSubtype: "Бомбер",
     extraField: "ApparelType",
     extraValue: "Бомбер"
+  },
+  {
+    key: "women-sweatshirts",
+    label: "Толстовки и свитшоты",
+    goodsType: "Женская одежда",
+    apparel: "Толстовки и свитшоты",
+    productSubtype: "Толстовка",
+    extraField: "GoodsSubType",
+    extraValue: "Толстовка",
+    categorySpecificFields: [{ tag: "GoodsSubType", value: "Толстовка" }],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "Size", "GoodsSubType", "TargetAudience"]
+  },
+  {
+    key: "women-tops",
+    label: "Топы и футболки",
+    goodsType: "Женская одежда",
+    apparel: "Топы и футболки",
+    productSubtype: "Футболка",
+    extraField: "TopType",
+    extraValue: "Футболка",
+    categorySpecificFields: [{ tag: "TopType", value: "Футболка" }],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "Size", "TopType", "TargetAudience"]
+  },
+  {
+    key: "women-jeans",
+    label: "Джинсы",
+    goodsType: "Женская одежда",
+    apparel: "Джинсы",
+    productSubtype: "Джинсы",
+    extraField: "WomenJeansModel",
+    extraValue: "Прямые",
+    categorySpecificFields: [{ tag: "WomenJeansModel", value: "Прямые" }],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "Size", "WomenJeansModel", "TargetAudience"]
+  },
+  {
+    key: "women-light-jackets",
+    label: "Лёгкие куртки и ветровки",
+    goodsType: "Верхняя одежда",
+    apparel: "Лёгкие куртки и ветровки",
+    productSubtype: "Лёгкая куртка",
+    extraField: "ApparelType",
+    extraValue: "Лёгкая куртка",
+    categorySpecificFields: [
+      { tag: "ApparelType", value: "Лёгкая куртка" },
+      { tag: "Hood", value: "Нет" }
+    ],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "ApparelType", "Size", "TargetAudience", "Hood"]
+  },
+  {
+    key: "men-sneakers",
+    label: "Кроссовки",
+    goodsType: "Мужская обувь",
+    apparel: "Кроссовки",
+    productSubtype: "Кроссовки",
+    extraField: "ApparelType",
+    extraValue: "Кроссовки",
+    categorySpecificFields: [{ tag: "ApparelType", value: "Кроссовки" }],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "VideoFileURL", "MultiItem", "MultiName", "ApparelType", "Size", "TargetAudience"]
+  },
+  {
+    key: "men-sport-shoes",
+    label: "Спортивная обувь",
+    goodsType: "Мужская обувь",
+    apparel: "Спортивная обувь",
+    productSubtype: "Спортивная обувь",
+    extraField: "ApparelType",
+    extraValue: "Спортивная обувь",
+    categorySpecificFields: [
+      { tag: "Model", value: "Спортивная обувь" },
+      { tag: "ApparelType", value: "Спортивная обувь" }
+    ],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Model", "Color", "MaterialsOdezhda", "VideoFileURL", "ApparelType", "Size", "TargetAudience"]
+  },
+  {
+    key: "men-home-shoes",
+    label: "Домашняя обувь",
+    goodsType: "Мужская обувь",
+    apparel: "Домашняя обувь",
+    productSubtype: "Домашняя обувь",
+    extraField: "ApparelType",
+    extraValue: "Домашняя обувь",
+    categorySpecificFields: [
+      { tag: "Model", value: "Домашняя обувь" },
+      { tag: "ApparelType", value: "Домашняя обувь" }
+    ],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Model", "Color", "MaterialsOdezhda", "VideoFileURL", "ApparelType", "Size", "TargetAudience"]
+  },
+  {
+    key: "women-sneakers",
+    label: "Кроссовки и кеды",
+    goodsType: "Женская обувь",
+    apparel: "Кроссовки и кеды",
+    productSubtype: "Кроссовки и кеды",
+    extraField: "ApparelType",
+    extraValue: "Кроссовки и кеды",
+    categorySpecificFields: [{ tag: "ApparelType", value: "Кроссовки и кеды" }],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Color", "ColorName", "MaterialsOdezhda", "VideoFileURL", "MultiItem", "MultiName", "ApparelType", "Size", "TargetAudience"]
+  },
+  {
+    key: "bags",
+    label: "Сумки",
+    goodsType: "Сумки, рюкзаки и чемоданы",
+    apparel: "Сумки",
+    productSubtype: "Сумки",
+    extraField: "ApparelType",
+    extraValue: "Сумки",
+    categorySpecificFields: [
+      { tag: "ApparelType", value: "Сумки" },
+      { tag: "Material", value: "Текстиль" },
+      { tag: "Gender", value: "Унисекс" }
+    ],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Model", "Color", "ColorName", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "ApparelType", "Material", "Gender", "TargetAudience"]
+  },
+  {
+    key: "backpacks",
+    label: "Рюкзаки",
+    goodsType: "Сумки, рюкзаки и чемоданы",
+    apparel: "Рюкзаки",
+    productSubtype: "Рюкзаки",
+    extraField: "Gender",
+    extraValue: "Унисекс",
+    categorySpecificFields: [
+      { tag: "Model", value: "Рюкзаки" },
+      { tag: "Gender", value: "Унисекс" }
+    ],
+    templateFields: ["GoodsType", "Condition", "AdType", "Brand", "Model", "Color", "ColorName", "VideoFileURL", "MultiItem", "MultiName", "Apparel", "Gender", "TargetAudience"]
   }
 ] as const;
 

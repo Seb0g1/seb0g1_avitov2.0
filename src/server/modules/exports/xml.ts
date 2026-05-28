@@ -3,6 +3,10 @@ import type { FeedRow } from "./feedRows";
 import { clothingFeedFieldMap } from "./fieldMap";
 import { sanitizeAvitoDescription } from "./description";
 
+function hasTemplateField(row: FeedRow, field: string) {
+  return row.templateFields.length === 0 || row.templateFields.includes(field);
+}
+
 export function buildAvitoXml(rows: FeedRow[]) {
   const root = create({ version: "1.0", encoding: "UTF-8" }).ele("Ads", {
     formatVersion: "3",
@@ -39,19 +43,33 @@ export function buildAvitoXml(rows: FeedRow[]) {
       ad.ele("Brand").txt(row.brand);
     }
     ad.ele(clothingFeedFieldMap.color).txt(row.color);
-    ad.ele(clothingFeedFieldMap.manufacturerColor).txt(row.manufacturerColor);
-    if (row.material) {
+    if (hasTemplateField(row, clothingFeedFieldMap.manufacturerColor)) {
+      ad.ele(clothingFeedFieldMap.manufacturerColor).txt(row.manufacturerColor);
+    }
+    if (row.material && hasTemplateField(row, clothingFeedFieldMap.material)) {
       ad.ele(clothingFeedFieldMap.material).txt(row.material);
     }
-    ad.ele(clothingFeedFieldMap.multiItem).txt(row.multiItem ? "Да" : "Нет");
-    ad.ele(clothingFeedFieldMap.multiItemName).txt(row.multiItemName);
-    ad.ele(clothingFeedFieldMap.clothingItem).txt(row.clothingItem);
-    for (const field of row.categorySpecificFields) {
-      ad.ele(field.tag).txt(field.value);
+    if (hasTemplateField(row, clothingFeedFieldMap.multiItem)) {
+      ad.ele(clothingFeedFieldMap.multiItem).txt(row.multiItem ? "Да" : "Нет");
     }
-    ad.ele(clothingFeedFieldMap.size).txt(row.size);
+    if (hasTemplateField(row, clothingFeedFieldMap.multiItemName)) {
+      ad.ele(clothingFeedFieldMap.multiItemName).txt(row.multiItemName);
+    }
+    if (hasTemplateField(row, clothingFeedFieldMap.clothingItem)) {
+      ad.ele(clothingFeedFieldMap.clothingItem).txt(row.clothingItem);
+    }
+    for (const field of row.categorySpecificFields) {
+      if (hasTemplateField(row, field.tag)) {
+        ad.ele(field.tag).txt(field.value);
+      }
+    }
+    if (hasTemplateField(row, clothingFeedFieldMap.size)) {
+      ad.ele(clothingFeedFieldMap.size).txt(row.size);
+    }
     ad.ele("TargetAudience").txt(row.targetAudience);
-    ad.ele(clothingFeedFieldMap.quantity).txt(String(row.quantity));
+    if (hasTemplateField(row, clothingFeedFieldMap.quantity)) {
+      ad.ele(clothingFeedFieldMap.quantity).txt(String(row.quantity));
+    }
   }
 
   return root.end({ prettyPrint: true });
